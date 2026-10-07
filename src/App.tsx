@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Auth } from './screens/Auth';
 import { Calendar } from './screens/Calendar';
 import { Dashboard } from './screens/Dashboard';
@@ -8,6 +8,7 @@ import { Permits } from './screens/Permits';
 import { Settings } from './screens/Settings';
 import { Today } from './screens/Today';
 import { hasSupabase } from './lib/supabase';
+import { onLinkClick, useRoute } from './route';
 import { AppProvider, useStore } from './state';
 import { useThemePref, type ThemePref } from './theme';
 import { Icon } from './ui';
@@ -19,22 +20,6 @@ const ROUTES = [
   { id: 'permessi', label: 'Permessi', icon: 'permit' },
   { id: 'impostazioni', label: 'Impostazioni', icon: 'settings' },
 ] as const;
-type RouteId = (typeof ROUTES)[number]['id'];
-
-function readRoute(): RouteId {
-  const h = window.location.hash.replace(/^#\/?/, '');
-  return (ROUTES.find((r) => r.id === h)?.id ?? 'oggi') as RouteId;
-}
-
-function useRoute(): RouteId {
-  const [r, setR] = useState<RouteId>(readRoute);
-  useEffect(() => {
-    const on = () => { setR(readRoute()); window.scrollTo({ top: 0 }); };
-    window.addEventListener('hashchange', on);
-    return () => window.removeEventListener('hashchange', on);
-  }, []);
-  return r;
-}
 
 const NEXT_THEME: Record<ThemePref, ThemePref> = { auto: 'light', light: 'dark', dark: 'auto' };
 const THEME_LABEL: Record<ThemePref, string> = { auto: 'Tema automatico', light: 'Tema chiaro', dark: 'Tema scuro' };
@@ -72,7 +57,7 @@ function Shell() {
       <nav className="rail" aria-label="Navigazione principale">
         <div className="brand"><span className="brand-mark"><Icon name="clock" size={20} /></span><span>Presenze<small>Le tue ore di lavoro</small></span></div>
         {ROUTES.map((r) => (
-          <a key={r.id} href={`#/${r.id}`} className="navlink" aria-current={route === r.id ? 'page' : undefined}><Icon name={r.icon} /> {r.label}</a>
+          <a key={r.id} href={`#/${r.id}`} onClick={onLinkClick(r.id)} className="navlink" aria-current={route === r.id ? 'page' : undefined}><Icon name={r.icon} /> {r.label}</a>
         ))}
         <div className="rail-foot">
           <button type="button" className="btn sm ghost" onClick={() => setTheme(NEXT_THEME[theme])} aria-label={`${THEME_LABEL[theme]}: cambia`}><Icon name={THEME_ICON[theme]} size={16} /> {THEME_LABEL[theme]}</button>
@@ -84,7 +69,7 @@ function Shell() {
 
       <nav className="tabbar" aria-label="Navigazione principale">
         {ROUTES.map((r) => (
-          <a key={r.id} href={`#/${r.id}`} className="tab" aria-current={route === r.id ? 'page' : undefined}>
+          <a key={r.id} href={`#/${r.id}`} onClick={onLinkClick(r.id)} className="tab" aria-current={route === r.id ? 'page' : undefined}>
             <span className="tab-ico"><Icon name={r.icon} /></span>{r.label}
           </a>
         ))}
@@ -93,7 +78,7 @@ function Shell() {
       {s.dayEditor ? <DayEditor key={s.dayEditor} day={s.dayEditor} /> : null}
       {s.permitEditor ? <PermitEditor key={s.permitEditor.permit?.id ?? s.permitEditor.day ?? 'new'} permit={s.permitEditor.permit} day={s.permitEditor.day} /> : null}
 
-      <div aria-live="polite" role="status">
+      <div className="toasts" aria-live="polite" role="status">
         {s.toasts.map((t) => <div key={t.id} className={`toast ${t.bad ? 'bad' : ''}`}>{t.text}</div>)}
       </div>
     </div>

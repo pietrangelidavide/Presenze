@@ -112,7 +112,7 @@ export function PermitEditor({ permit, day: dayProp }: { permit?: Permit; day?: 
 
         {permit ? (
           confirmDelete ? (
-            <div className="warn bad"><span style={{ flex: 1 }}>Eliminare questo permesso?</span>
+            <div className="warn bad"><span>Eliminare questo permesso?</span>
               <button type="button" className="btn sm danger" onClick={() => void remove()}>Sì, elimina</button>
               <button type="button" className="btn sm" onClick={() => setConfirmDelete(false)}>No</button>
             </div>

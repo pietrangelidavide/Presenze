@@ -16,6 +16,8 @@ export interface Repo {
   /** Sostituisce tutti i dati (importazione, dati di esempio). */
   replaceAll(d: Data): Promise<void>;
   clearAll(): Promise<void>;
+  /** Vero se il browser non permette di conservare i dati: restano solo finché la pagina è aperta. */
+  volatile?: boolean;
 }
 
 const MODES: Mode[] = ['office', 'smart', 'vacation', 'sick', 'holiday'];
@@ -107,10 +109,16 @@ export function parseImport(textIn: string, today: string): Data {
 // ─────────────────────────── modo locale ───────────────────────────
 export const LOCAL_KEY = 'presenze.v1';
 
+/** L'archivio del browser, oppure null se non c'è o l'accesso è vietato (navigazione privata, pagina incorporata). */
+function browserStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null {
+  try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; }
+}
+
 export class LocalRepo implements Repo {
   kind = 'local' as const;
+  volatile = false;
   private data: Data | null = null;
-  constructor(private today: () => string, private storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null = typeof localStorage !== 'undefined' ? localStorage : null) {}
+  constructor(private today: () => string, private storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null = browserStorage()) {}
 
   private read(): Data {
     if (this.data) return this.data;
@@ -120,8 +128,13 @@ export class LocalRepo implements Repo {
     return this.data;
   }
   private write(): void {
-    try { this.storage?.setItem(LOCAL_KEY, JSON.stringify(this.data)); }
-    catch { throw new Error('Il browser non permette di salvare i dati (spazio esaurito o navigazione privata).'); }
+    try {
+      if (!this.storage) throw new Error('nessun archivio');
+      this.storage.setItem(LOCAL_KEY, JSON.stringify(this.data));
+      this.volatile = false;
+    } catch {
+      this.volatile = true; // i dati restano in memoria finché la pagina è aperta
+    }
   }
 
   async load(): Promise<Data> { return structuredCloneSafe(this.read()); }

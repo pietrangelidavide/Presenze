@@ -127,3 +127,16 @@ test('dati di esempio: verosimili e completi', () => {
   // oggi vuoto: si può timbrare subito
   assert.equal(data.days.find((e) => e.day === TODAY), undefined);
 });
+
+test('archivio locale: se il browser non conserva i dati, restano in memoria e lo segnala', async () => {
+  const broken = { getItem: () => { throw new Error('bloccato'); }, setItem: () => { throw new Error('bloccato'); }, removeItem: () => { throw new Error('bloccato'); } };
+  const repo = new LocalRepo(() => TODAY, broken);
+  assert.equal(repo.volatile, false);
+  await repo.saveDay({ day: '2026-10-05', mode: 'office', clockIn: '08:30', clockOut: '16:30', breakMin: null, note: null });
+  const p = await repo.addPermit({ day: '2026-10-05', minutes: 30, start: null, reason: 'personal', note: null });
+  assert.equal(repo.volatile, true);
+  const d = await repo.load();
+  assert.equal(d.days.length, 1);
+  assert.equal(d.permits[0].id, p.id);
+  await repo.clearAll();
+});

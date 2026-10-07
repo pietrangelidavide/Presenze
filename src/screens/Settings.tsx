@@ -68,6 +68,9 @@ type Confirm = null | 'demo' | 'clear' | { import: ReturnType<typeof parseImport
 export function Settings() {
   const s = useStore();
   const { ctx, today, data } = s;
+  const save = (name: string, text: string, mime: string) => {
+    void download(name, text, mime).then((r) => { if (r === 'failed') s.toast('Non sono riuscito a scaricare il file. Riprova.', true); });
+  };
   const st = ctx.settings;
   const [theme] = useThemePref();
   const [confirm, setConfirm] = useState<Confirm>(null);
@@ -149,11 +152,11 @@ export function Settings() {
         <div className="card-head"><div><h2>I tuoi dati</h2>
           <p className="card-sub">{s.kind === 'local' ? 'Sono salvati solo in questo browser. Fai ogni tanto una copia di sicurezza.' : 'Sono salvati nel tuo account e li ritrovi su ogni dispositivo.'}</p></div></div>
         <div className="row wrap">
-          <button type="button" className="btn sm" onClick={() => download(`presenze-copia-${today}.json`, exportJson(data), 'application/json')}><Icon name="download" size={16} /> Copia di sicurezza</button>
+          <button type="button" className="btn sm" onClick={() => save(`presenze-copia-${today}.json`, exportJson(data), 'application/json')}><Icon name="download" size={16} /> Copia di sicurezza</button>
           <button type="button" className="btn sm" onClick={() => file.current?.click()}><Icon name="upload" size={16} /> Ripristina da copia</button>
           <input ref={file} type="file" accept="application/json,.json" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
-          <button type="button" className="btn sm" onClick={() => download(`presenze-giornate-${today}.csv`, csvDays(s.tl, s.tl.first, s.tl.today), 'text/csv;charset=utf-8')}><Icon name="download" size={16} /> Giornate (CSV)</button>
-          <button type="button" className="btn sm" onClick={() => download(`presenze-permessi-${today}.csv`, csvPermits(ctx, '1900-01-01', '2999-12-31'), 'text/csv;charset=utf-8')}><Icon name="download" size={16} /> Permessi (CSV)</button>
+          <button type="button" className="btn sm" onClick={() => save(`presenze-giornate-${today}.csv`, csvDays(s.tl, s.tl.first, s.tl.today), 'text/csv;charset=utf-8')}><Icon name="download" size={16} /> Giornate (CSV)</button>
+          <button type="button" className="btn sm" onClick={() => save(`presenze-permessi-${today}.csv`, csvPermits(ctx, '1900-01-01', '2999-12-31'), 'text/csv;charset=utf-8')}><Icon name="download" size={16} /> Permessi (CSV)</button>
         </div>
         <div className="row wrap" style={{ marginTop: 10 }}>
           {s.kind === 'local' ? <button type="button" className="btn sm ghost" onClick={() => setConfirm('demo')}>Prova con dati di esempio</button> : null}
@@ -161,7 +164,7 @@ export function Settings() {
         </div>
         {confirm ? (
           <div className="warn bad" style={{ marginTop: 12 }} role="alert">
-            <span style={{ flex: 1 }}>
+            <span>
               {confirm === 'demo' ? 'I dati attuali verranno sostituiti da quelli di esempio. Prima fai una copia di sicurezza se ti servono.' : confirm === 'clear' ? 'Cancellare giornate, permessi e impostazioni? Non si può annullare.' : `Sostituire i dati attuali con quelli del file (${confirm.import.days.length} giornate, ${confirm.import.permits.length} permessi)?`}
             </span>
             <button type="button" className="btn sm danger" onClick={async () => {

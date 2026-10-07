@@ -78,6 +78,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [permitEditor, openPermit] = useState<{ permit?: Permit; day?: string } | null>(null);
   const repoRef = useRef<Repo | null>(null);
   const dataRef = useRef(data);
+  const warnedVolatile = useRef(false);
   dataRef.current = data;
   const toastId = useRef(0);
 
@@ -142,6 +143,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setData(apply(before));
     try {
       await remote(repo);
+      if (repo.volatile && !warnedVolatile.current) {
+        warnedVolatile.current = true;
+        toast('Questo browser non conserva i dati: se chiudi la pagina li perdi. Fai una copia di sicurezza da Impostazioni.', true);
+      }
       return true;
     } catch (e) {
       setData(before);

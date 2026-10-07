@@ -6,6 +6,7 @@ import {
   type Period, type PeriodKind, type Summary,
 } from '../lib/stats';
 import { addDays, clock, dayLong, dayMonth, dayShort, diffDays, dur, durSigned, isYmd } from '../lib/time';
+import { onLinkClick } from '../route';
 import { useStore } from '../state';
 import { Icon, Segmented } from '../ui';
 import { DashboardCharts } from './DashboardCharts';
@@ -44,6 +45,9 @@ function Kpi({ k, v, unit, s, d, fmtD, good, prevName, hero }: {
 export function Dashboard() {
   const s = useStore();
   const { tl, today, ctx, data } = s;
+  const save = (name: string, text: string, mime: string) => {
+    void download(name, text, mime).then((r) => { if (r === 'failed') s.toast('Non sono riuscito a scaricare il file. Riprova.', true); });
+  };
   const [kind, setKind] = useState<PeriodKind>('month');
   const [anchor, setAnchor] = useState(today);
   const [custom, setCustom] = useState({ from: addDays(today, -29), to: today });
@@ -83,7 +87,7 @@ export function Dashboard() {
         <section className="card empty">
           <b>Non ci sono ancora giornate registrate</b>
           <span>Appena registri qualche giornata compaiono ore, saldo, orari, smart working e permessi. Intanto puoi vedere come funziona con dati di esempio.</span>
-          {s.kind === 'local' ? <button type="button" className="btn primary" onClick={() => void s.replaceAll(demoData(today))}>Carica dati di esempio</button> : <a className="btn primary" href="#/oggi">Vai a Oggi</a>}
+          {s.kind === 'local' ? <button type="button" className="btn primary" onClick={() => void s.replaceAll(demoData(today))}>Carica dati di esempio</button> : <a className="btn primary" href="#/oggi" onClick={onLinkClick('oggi')}>Vai a Oggi</a>}
         </section>
       </div>
     );
@@ -114,8 +118,8 @@ export function Dashboard() {
       <header className="page-head" style={{ marginBottom: 0 }}>
         <div><h1>Dashboard</h1><p className="sub">{dayMonth(period.from)} – {dayMonth(period.to)} · {sum.calendarDays} giorni{prev ? ` · confronto con ${partial ? `i primi ${elapsedDays} giorni ${PREV_OF[kind]}` : PREV_FULL[kind]}` : ''}</p></div>
         <div className="actions">
-          <button type="button" className="btn sm" onClick={() => download(`presenze-giornate-${period.from}_${end}.csv`, csvDays(tl, period.from, end < period.from ? period.from : end), 'text/csv;charset=utf-8')}><Icon name="download" size={16} /> Giornate (CSV)</button>
-          <button type="button" className="btn sm" onClick={() => download(`presenze-permessi-${period.from}_${period.to}.csv`, csvPermits(ctx, period.from, period.to), 'text/csv;charset=utf-8')}><Icon name="download" size={16} /> Permessi (CSV)</button>
+          <button type="button" className="btn sm" onClick={() => save(`presenze-giornate-${period.from}_${end}.csv`, csvDays(tl, period.from, end < period.from ? period.from : end), 'text/csv;charset=utf-8')}><Icon name="download" size={16} /> Giornate (CSV)</button>
+          <button type="button" className="btn sm" onClick={() => save(`presenze-permessi-${period.from}_${period.to}.csv`, csvPermits(ctx, period.from, period.to), 'text/csv;charset=utf-8')}><Icon name="download" size={16} /> Permessi (CSV)</button>
         </div>
       </header>
 

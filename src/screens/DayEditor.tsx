@@ -178,7 +178,7 @@ export function DayEditor({ day }: { day: string }) {
 
         {existing ? (
           confirmDelete ? (
-            <div className="warn bad"><span style={{ flex: 1 }}>Eliminare tutti i dati di questa giornata? I permessi restano.</span>
+            <div className="warn bad"><span>Eliminare tutti i dati di questa giornata? I permessi restano.</span>
               <button type="button" className="btn sm danger" onClick={() => void remove()}>Sì, elimina</button>
               <button type="button" className="btn sm" onClick={() => setConfirmDelete(false)}>No</button>
             </div>
