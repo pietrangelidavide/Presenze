@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 
 export type ThemePref = 'auto' | 'light' | 'dark';
 const KEY = 'presenze-tema';
-const COLORS = { light: '#FAF8F3', dark: '#070706' };
+const COLORS = { light: '#F1F3F8', dark: '#13162E' };
 
 function read(): ThemePref {
   try { const t = localStorage.getItem(KEY); return t === 'light' || t === 'dark' ? t : 'auto'; } catch { return 'auto'; }

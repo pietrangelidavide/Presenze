@@ -99,7 +99,7 @@ Le pagine usano indirizzi con `#` (per esempio `/#/dashboard`), quindi non servo
 
 - React 19 + TypeScript + Vite
 - Supabase (accesso con email e password, database Postgres con Row Level Security) oppure `localStorage` in modalità locale
-- Grafici disegnati a mano in SVG (nessuna libreria), tema dorato/nero in stile DF con tema automatico chiaro/scuro
+- Grafici disegnati a mano in SVG (nessuna libreria), stile blu notte, giallo e blu cobalto (ispirato ai colori di Poste Italiane, senza usarne il logo) con tema automatico chiaro/scuro
 
 ```
 src/lib/       regole di calcolo (calc), statistiche (stats), salvataggio (store), festività, dati di esempio

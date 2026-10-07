@@ -46,7 +46,7 @@ export function LineChart({ points, start, height = 230, format, ariaLabel, seri
   }
 
   const act = a.active !== null ? points[a.active] : null;
-  const tip = act && a.active !== null ? { x: x(a.active), y: y(act.value), title: act.label, rows: [{ label: seriesName, value: format(act.value), color: 'var(--v-gold)' }] } : null;
+  const tip = act && a.active !== null ? { x: x(a.active), y: y(act.value), title: act.label, rows: [{ label: seriesName, value: format(act.value), color: 'var(--v-brand)' }] } : null;
   const last = n ? points[n - 1] : null;
 
   const onMove = (e: React.PointerEvent<SVGRectElement>) => {
@@ -68,20 +68,20 @@ export function LineChart({ points, start, height = 230, format, ariaLabel, seri
               <text x={M.l - 8} y={y(t) + 4} textAnchor="end">{axisSigned(t)}</text>
             </g>
           ))}
-          {n > 1 ? <path d={area} fill="var(--v-gold)" opacity={0.12} /> : null}
-          {n > 1 ? <path d={path} fill="none" stroke="var(--v-gold)" strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" /> : null}
-          {n === 1 ? <circle cx={x(0)} cy={y(points[0].value)} r={4} fill="var(--v-gold)" /> : null}
+          {n > 1 ? <path d={area} fill="var(--v-brand)" opacity={0.12} /> : null}
+          {n > 1 ? <path d={path} fill="none" stroke="var(--v-brand)" strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" /> : null}
+          {n === 1 ? <circle cx={x(0)} cy={y(points[0].value)} r={4} fill="var(--v-brand)" /> : null}
           {labels.map((l) => <text key={l.i} x={x(l.i)} y={height - 8} textAnchor={l.i === 0 ? 'start' : 'middle'}>{l.t}</text>)}
           {last && a.active === null ? (
             <g>
-              <circle cx={x(n - 1)} cy={y(last.value)} r={4.5} fill="var(--v-gold)" stroke="var(--card)" strokeWidth={2} />
+              <circle cx={x(n - 1)} cy={y(last.value)} r={4.5} fill="var(--v-brand)" stroke="var(--card)" strokeWidth={2} />
               <text x={x(n - 1)} y={y(last.value) - 10} textAnchor="end" style={{ fill: 'var(--text)', fontWeight: 650, fontSize: 12.5, stroke: 'var(--card)', strokeWidth: 4, paintOrder: 'stroke' }}>{format(last.value)}</text>
             </g>
           ) : null}
           {act && a.active !== null ? (
             <g pointerEvents="none">
               <line x1={x(a.active)} x2={x(a.active)} y1={M.t} y2={M.t + plotH} stroke="var(--v-ink2)" strokeWidth={1} strokeDasharray="3 3" />
-              <circle cx={x(a.active)} cy={y(act.value)} r={5} fill="var(--v-gold)" stroke="var(--card)" strokeWidth={2} />
+              <circle cx={x(a.active)} cy={y(act.value)} r={5} fill="var(--v-brand)" stroke="var(--card)" strokeWidth={2} />
             </g>
           ) : null}
           <rect className="hit" x={M.l} y={M.t} width={plotW} height={plotH} onPointerMove={onMove} onPointerDown={onMove}

@@ -219,7 +219,7 @@ function Ruler({ info, exit, nowMin }: { info: DayInfo; exit: number | null; now
       </div>
       <div className="ruler-ticks" aria-hidden="true">{ticks.map((t) => <span key={t} style={{ left: pct(t) }}>{clock(t).replace(/^0/, '')}</span>)}</div>
       <div className="ruler-legend">
-        <span><i style={{ background: 'linear-gradient(90deg,#E2B33F,#F6D77A)' }} />Presenza</span>
+        <span><i style={{ background: 'var(--accent)' }} />Presenza</span>
         {open && exit !== null ? <span><i style={{ border: '1px dashed var(--accent-border)' }} />Fino all’uscita prevista</span> : null}
         {open ? <span><i style={{ background: 'var(--text)', width: 3 }} />Adesso</span> : null}
       </div>
@@ -308,8 +308,8 @@ function BalanceCard() {
       {!flat ? (
         <svg viewBox="0 0 300 56" width="100%" role="img" aria-label="Andamento della banca ore nelle ultime 16 settimane" style={{ marginTop: 10, overflow: 'visible' }}>
           <line x1="4" x2="296" y1={Y(0)} y2={Y(0)} stroke="var(--v-axis)" strokeDasharray="3 4" />
-          <path d={path} fill="none" stroke="var(--v-gold)" strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
-          <circle cx={X(pts.length - 1)} cy={Y(pts[pts.length - 1])} r={4.5} fill="var(--v-gold)" stroke="var(--card)" strokeWidth={2} />
+          <path d={path} fill="none" stroke="var(--v-brand)" strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
+          <circle cx={X(pts.length - 1)} cy={Y(pts[pts.length - 1])} r={4.5} fill="var(--v-brand)" stroke="var(--card)" strokeWidth={2} />
         </svg>
       ) : (
         <p className="muted" style={{ marginTop: 10, fontSize: 13.5 }}>Il grafico compare quando avrai qualche settimana di dati.</p>

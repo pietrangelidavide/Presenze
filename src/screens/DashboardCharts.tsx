@@ -13,7 +13,7 @@ import {
 import { capFirst, clock, dayLong, dayMonth, diffDays, dur, durSigned, MONTH_LONG } from '../lib/time';
 import { MODE_LABEL, REASON_LABEL } from '../lib/types';
 
-const GOLD = 'var(--v-gold)';
+const GOLD = 'var(--v-brand)';
 const C = { office: 'var(--v-ufficio)', smart: 'var(--v-smart)', vacation: 'var(--v-ferie)', sick: 'var(--v-malattia)' };
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const signed = (v: number) => (v === 0 ? '0h' : durSigned(v));
@@ -148,7 +148,7 @@ export function DashboardCharts({ tl, period }: { tl: Timeline; period: Period }
       </div>
 
       <h2 className="section-title">Anno a colpo d’occhio</h2>
-      <ChartCard title={`Mappa del ${year}`} subtitle="Una casella per giorno: più è scura, più ore nette. Il periodo scelto è in evidenza." id="mappa" table={heatTable}>
+      <ChartCard title={`Mappa del ${year}`} subtitle="Una casella per giorno: più il colore è intenso, più ore nette. Il periodo scelto è in evidenza." id="mappa" table={heatTable}>
         <Heatmap cells={heat} today={tl.today} ariaLabel={`Calendario del ${year} con le ore nette di ogni giorno. La vista tabella riassume i mesi.`} />
       </ChartCard>
 

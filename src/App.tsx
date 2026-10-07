@@ -70,7 +70,7 @@ function Shell() {
   return (
     <div className="app">
       <nav className="rail" aria-label="Navigazione principale">
-        <div className="brand"><span className="brand-mark"><Icon name="clock" size={20} /></span><span>Presenze<small>by DF</small></span></div>
+        <div className="brand"><span className="brand-mark"><Icon name="clock" size={20} /></span><span>Presenze<small>Le tue ore di lavoro</small></span></div>
         {ROUTES.map((r) => (
           <a key={r.id} href={`#/${r.id}`} className="navlink" aria-current={route === r.id ? 'page' : undefined}><Icon name={r.icon} /> {r.label}</a>
         ))}
