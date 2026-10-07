@@ -1,0 +1,58 @@
+/* Colori: stessa base di DF (oro e nero), con tema chiaro/scuro.
+   - chiaro: predefinito
+   - scuro: segue il sistema, a meno che l'utente scelga "Chiaro" (data-theme="light")
+   - scuro forzato: data-theme="dark"
+   I valori dei grafici (--v-*, --h*) sono validati con validate_palette.js su queste superfici. */
+:root {
+  color-scheme: light;
+  --bg: #FAF8F3; --card: #FFFFFF; --card2: #F2EEE4; --line: #DCD5C2;
+  --text: #1A160D; --muted: #6B6554;
+  --accent: #ECC052; --accent2: #B98A22; --accent-soft: rgba(185, 138, 34, 0.14);
+  --accent-text: #7F5C0D; --accent-border: #B38420; --on-accent: #1A160D;
+  --danger: #C8362B; --danger-soft: rgba(200, 54, 43, 0.10); --ok: #178A49; --ok-soft: rgba(23, 138, 73, 0.12);
+  --glass-a: rgba(255, 255, 255, 0.82); --glass-b: rgba(255, 255, 255, 0.42); --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-tint: rgba(236, 192, 82, 0.18); --scrim: rgba(26, 22, 13, 0.45);
+  --shadow: 0 12px 32px rgba(58, 45, 11, 0.13); --hairline: rgba(26, 22, 13, 0.10);
+  --glow: rgba(236, 192, 82, 0.30); --nav-bg: rgba(250, 248, 243, 0.9);
+  --hero-a: #F5E6B8; --hero-b: #FBF3DC;
+  --v-ufficio: #2a78d6; --v-smart: #eb6834; --v-ferie: #1baf7a; --v-malattia: #eda100; --v-festivo: #898781;
+  --v-up: #2a78d6; --v-down: #e34948; --v-gold: #B98A22;
+  --v-grid: #e1e0d9; --v-axis: #c3c2b7; --v-ink2: #52514e; --v-muted: #898781; --v-mid: #f0efec;
+  --h0: #F2EEE4; --h1: #d6b04a; --h2: #c4962c; --h3: #a77b12; --h4: #7d5807; --h5: #523603;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  color-scheme: dark;
+    --bg: #070706; --card: #11100E; --card2: #1A1815; --line: #2A2722;
+    --text: #F8F4EA; --muted: #A39D8E;
+    --accent: #ECC052; --accent2: #B98A22; --accent-soft: rgba(236, 192, 82, 0.14);
+    --accent-text: #ECC052; --accent-border: #ECC052; --on-accent: #1A160D;
+    --danger: #FF6B5E; --danger-soft: rgba(255, 107, 94, 0.14); --ok: #3DDC84; --ok-soft: rgba(61, 220, 132, 0.12);
+    --glass-a: rgba(255, 255, 255, 0.12); --glass-b: rgba(255, 255, 255, 0.03); --glass-border: rgba(255, 255, 255, 0.14);
+    --glass-tint: rgba(236, 192, 82, 0.10); --scrim: rgba(0, 0, 0, 0.65);
+    --shadow: 0 14px 36px rgba(0, 0, 0, 0.5); --hairline: rgba(255, 255, 255, 0.10);
+    --glow: rgba(236, 192, 82, 0.16); --nav-bg: rgba(7, 7, 6, 0.88);
+    --hero-a: #2B2111; --hero-b: #0B0A07;
+    --v-ufficio: #3987e5; --v-smart: #d95926; --v-ferie: #199e70; --v-malattia: #c98500; --v-festivo: #898781;
+    --v-up: #3987e5; --v-down: #e66767; --v-gold: #ECC052;
+    --v-grid: #2c2c2a; --v-axis: #383835; --v-ink2: #c3c2b7; --v-muted: #898781; --v-mid: #383835;
+    --h0: #1A1815; --h1: #5a4415; --h2: #86641b; --h3: #b58a26; --h4: #dfb23f; --h5: #f8dc86;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #070706; --card: #11100E; --card2: #1A1815; --line: #2A2722;
+  --text: #F8F4EA; --muted: #A39D8E;
+  --accent: #ECC052; --accent2: #B98A22; --accent-soft: rgba(236, 192, 82, 0.14);
+  --accent-text: #ECC052; --accent-border: #ECC052; --on-accent: #1A160D;
+  --danger: #FF6B5E; --danger-soft: rgba(255, 107, 94, 0.14); --ok: #3DDC84; --ok-soft: rgba(61, 220, 132, 0.12);
+  --glass-a: rgba(255, 255, 255, 0.12); --glass-b: rgba(255, 255, 255, 0.03); --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-tint: rgba(236, 192, 82, 0.10); --scrim: rgba(0, 0, 0, 0.65);
+  --shadow: 0 14px 36px rgba(0, 0, 0, 0.5); --hairline: rgba(255, 255, 255, 0.10);
+  --glow: rgba(236, 192, 82, 0.16); --nav-bg: rgba(7, 7, 6, 0.88);
+  --hero-a: #2B2111; --hero-b: #0B0A07;
+  --v-ufficio: #3987e5; --v-smart: #d95926; --v-ferie: #199e70; --v-malattia: #c98500; --v-festivo: #898781;
+  --v-up: #3987e5; --v-down: #e66767; --v-gold: #ECC052;
+  --v-grid: #2c2c2a; --v-axis: #383835; --v-ink2: #c3c2b7; --v-muted: #898781; --v-mid: #383835;
+  --h0: #1A1815; --h1: #5a4415; --h2: #86641b; --h3: #b58a26; --h4: #dfb23f; --h5: #f8dc86;
+}
