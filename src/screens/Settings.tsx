@@ -179,14 +179,10 @@ export function Settings() {
 
       <section className="card" aria-label="Account">
         <div className="card-head"><div><h2>Account</h2></div></div>
-        {s.kind === 'cloud' ? (
-          <div className="row wrap"><span style={{ flex: 1 }}>Accesso come <b>{s.email}</b></span><button type="button" className="btn sm" onClick={() => void s.signOut()}><Icon name="logout" size={16} /> Esci</button></div>
-        ) : (
-          <div className="stack" style={{ gap: 6 }}>
-            <p><b>Modo locale.</b> Non serve nessun account: i dati restano in questo browser e non si sincronizzano con altri dispositivi.</p>
-            <p className="muted">Per usare l’app su telefono e computer con lo stesso account, collega Supabase (guida nel file README).</p>
-          </div>
-        )}
+        <div className="stack" style={{ gap: 10 }}>
+          <div className="row wrap"><span style={{ flex: 1, minWidth: 0 }}>Accesso come <b>{s.name ? `${s.name} · ${s.email}` : s.email}</b></span><button type="button" className="btn sm" onClick={() => void s.signOut()}><Icon name="logout" size={16} /> Esci</button></div>
+          {s.kind === 'local' ? <p className="muted">Questo account vive solo in questo browser: i dati non si sincronizzano con altri dispositivi. Per usare lo stesso account su telefono e computer collega Supabase (guida nel file README).</p> : null}
+        </div>
       </section>
     </div>
   );

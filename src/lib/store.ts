@@ -118,19 +118,19 @@ export class LocalRepo implements Repo {
   kind = 'local' as const;
   volatile = false;
   private data: Data | null = null;
-  constructor(private today: () => string, private storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null = browserStorage()) {}
+  constructor(private today: () => string, private storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null = browserStorage(), private key: string = LOCAL_KEY) {}
 
   private read(): Data {
     if (this.data) return this.data;
     let raw: unknown = null;
-    try { const t = this.storage?.getItem(LOCAL_KEY); raw = t ? JSON.parse(t) : null; } catch { raw = null; }
+    try { const t = this.storage?.getItem(this.key); raw = t ? JSON.parse(t) : null; } catch { raw = null; }
     this.data = sanitizeData(raw, this.today());
     return this.data;
   }
   private write(): void {
     try {
       if (!this.storage) throw new Error('nessun archivio');
-      this.storage.setItem(LOCAL_KEY, JSON.stringify(this.data));
+      this.storage.setItem(this.key, JSON.stringify(this.data));
       this.volatile = false;
     } catch {
       this.volatile = true; // i dati restano in memoria finché la pagina è aperta
@@ -155,7 +155,7 @@ export class LocalRepo implements Repo {
   async updatePermit(p: Permit) { const d = this.read(); d.permits = d.permits.map((x) => (x.id === p.id ? p : x)); this.write(); }
   async deletePermit(id: string) { const d = this.read(); d.permits = d.permits.filter((x) => x.id !== id); this.write(); }
   async replaceAll(next: Data) { this.data = structuredCloneSafe(next); this.write(); }
-  async clearAll() { this.data = sanitizeData(null, this.today()); try { this.storage?.removeItem(LOCAL_KEY); } catch { /* niente da fare */ } }
+  async clearAll() { this.data = sanitizeData(null, this.today()); try { this.storage?.removeItem(this.key); } catch { /* niente da fare */ } }
 }
 
 const structuredCloneSafe = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;

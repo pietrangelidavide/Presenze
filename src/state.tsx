@@ -1,6 +1,7 @@
 // Stato dell'app: dati, orologio, azioni di salvataggio e finestre aperte.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { makeCtx, type Ctx } from './lib/calc';
+import { accountBook } from './lib/accounts';
 import { CloudRepo, LocalRepo, sanitizeData, type Repo } from './lib/store';
 import { buildTimeline, type Timeline } from './lib/stats';
 import { supabase } from './lib/supabase';
@@ -15,6 +16,8 @@ export interface Store {
   error: string | null;
   kind: 'local' | 'cloud';
   email: string | null;
+  /** Il nome scelto alla registrazione (se c'è). */
+  name: string | null;
   data: Data;
   ctx: Ctx;
   tl: Timeline;
@@ -62,6 +65,11 @@ function useNow(): Date {
 }
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : 'Errore sconosciuto');
+/** Il nome scelto alla registrazione, se c'è (Supabase lo tiene tra i dati dell'utente). */
+const userName = (u: { user_metadata?: Record<string, unknown> | null }): string | null => {
+  const n = u.user_metadata?.name;
+  return typeof n === 'string' && n.trim() ? n.trim().slice(0, 60) : null;
+};
 const todayNow = () => ymd(new Date());
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -72,6 +80,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [boot, setBoot] = useState<Boot>('loading');
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(null);
   const [data, setData] = useState<Data>(() => sanitizeData(null, todayNow()));
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [dayEditor, openDay] = useState<string | null>(null);
@@ -93,7 +102,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     let uid: string | null = null;
 
-    const start = async (repo: Repo, mail: string | null, id: string | null) => {
+    const start = async (repo: Repo, mail: string | null, id: string | null, who: string | null) => {
       uid = id;
       setBoot('loading');
       try {
@@ -101,6 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         repoRef.current = repo;
         setEmail(mail);
+        setName(who);
         setData(d);
         setBoot('ready');
       } catch (e) {
@@ -111,20 +121,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     if (!supabase) {
-      void start(new LocalRepo(todayNow), null, null);
-      return () => { cancelled = true; };
+      // Modo locale: gli account stanno in questo browser (vedi lib/accounts).
+      const book = accountBook();
+      const sync = () => {
+        if (cancelled) return;
+        const u = book.session();
+        if (!u) { uid = null; repoRef.current = null; setData(sanitizeData(null, todayNow())); setEmail(null); setName(null); setBoot('auth'); return; }
+        if (u.id === uid) return;
+        void start(new LocalRepo(todayNow, undefined, book.dataKey(u.id)), u.email, u.id, u.name);
+      };
+      sync();
+      const off = book.subscribe(sync);
+      return () => { cancelled = true; off(); };
     }
     const db = supabase;
     void db.auth.getSession().then(({ data: s }) => {
       if (cancelled) return;
-      if (s.session) void start(new CloudRepo(db, s.session.user.id, todayNow), s.session.user.email ?? null, s.session.user.id);
+      if (s.session) void start(new CloudRepo(db, s.session.user.id, todayNow), s.session.user.email ?? null, s.session.user.id, userName(s.session.user));
       else setBoot('auth');
     });
     const { data: sub } = db.auth.onAuthStateChange((evt, session) => {
       if (cancelled) return;
       if (evt === 'SIGNED_OUT') { uid = null; repoRef.current = null; setData(sanitizeData(null, todayNow())); setBoot('auth'); }
       else if (session && session.user.id !== uid && (evt === 'SIGNED_IN' || evt === 'INITIAL_SESSION')) {
-        void start(new CloudRepo(db, session.user.id, todayNow), session.user.email ?? null, session.user.id);
+        void start(new CloudRepo(db, session.user.id, todayNow), session.user.email ?? null, session.user.id, userName(session.user));
       }
     });
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
@@ -179,13 +199,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast]);
 
-  const signOut = useCallback(async () => { if (supabase) await supabase.auth.signOut(); }, []);
+  const signOut = useCallback(async () => { if (supabase) await supabase.auth.signOut(); else accountBook().signOut(); }, []);
 
   const ctx = useMemo(() => makeCtx(data), [data]);
   const tl = useMemo(() => buildTimeline(ctx, today, 0), [ctx, today]);
 
   const value: Store = {
-    boot, error, kind: supabase ? 'cloud' : 'local', email, data, ctx, tl, now, today, nowMin, toasts, toast,
+    boot, error, kind: supabase ? 'cloud' : 'local', email, name, data, ctx, tl, now, today, nowMin, toasts, toast,
     saveDay, deleteDay, addPermit, updatePermit, deletePermit, saveSettings, replaceAll, clearAll, signOut, reload,
     dayEditor, openDay, permitEditor, openPermit,
   };

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Auth } from './screens/Auth';
+import { Auth, Backdrop } from './screens/Auth';
 import { Calendar } from './screens/Calendar';
 import { Dashboard } from './screens/Dashboard';
 import { DayEditor } from './screens/DayEditor';
@@ -30,11 +30,11 @@ function Shell() {
   const route = useRoute();
   const [theme, setTheme] = useThemePref();
 
-  if (s.boot === 'loading') return <div className="auth" role="status" aria-live="polite"><p className="muted">Carico i tuoi dati…</p></div>;
+  if (s.boot === 'loading') return <div className="auth" role="status" aria-live="polite"><Backdrop /><p className="muted">Carico i tuoi dati…</p></div>;
   if (s.boot === 'auth') return <Auth />;
   if (s.boot === 'error') {
     return (
-      <div className="auth"><div className="card stack" role="alert">
+      <div className="auth"><Backdrop /><div className="card stack" role="alert">
         <h2>Non riesco a leggere i dati</h2>
         <p className="muted">{s.error}</p>
         <p className="muted">Controlla la connessione e che il database sia stato preparato (file supabase/setup.sql).</p>
@@ -61,7 +61,11 @@ function Shell() {
         ))}
         <div className="rail-foot">
           <button type="button" className="btn sm ghost" onClick={() => setTheme(NEXT_THEME[theme])} aria-label={`${THEME_LABEL[theme]}: cambia`}><Icon name={THEME_ICON[theme]} size={16} /> {THEME_LABEL[theme]}</button>
-          {!hasSupabase ? <span className="muted" style={{ fontSize: 12.5 }}>Modo locale: i dati restano in questo browser.</span> : <span className="muted" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.email}</span>}
+          <span className="muted" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {s.name ? <b style={{ display: 'block', color: 'var(--text)' }}>{s.name}</b> : null}
+            {s.email}
+            {!hasSupabase ? <span style={{ display: 'block' }}>I dati restano in questo browser.</span> : null}
+          </span>
         </div>
       </nav>
 

@@ -50,7 +50,7 @@ npm run dev
 
 Apri l'indirizzo che compare (di solito `http://localhost:5173`).
 
-**Senza fare altro l'app parte in modalità locale**: i dati restano nel browser di quel dispositivo (nessun account). In *Impostazioni → I tuoi dati* c'è la copia di sicurezza e un pulsante per caricare dati di esempio e vedere la dashboard piena.
+**Senza fare altro l'app parte in modalità locale**: all'avvio compare la pagina di accesso, dove ognuno crea il suo account (nome, email e password) e ha i suoi dati separati. Account e dati restano nel browser di quel dispositivo e non vengono inviati altrove: servono a non mescolare i dati di chi usa lo stesso dispositivo, non a nasconderli a chi ha accesso al dispositivo. Se in questo browser c'erano già dei dati, passano al primo account creato. La password locale non si può recuperare. In *Impostazioni → I tuoi dati* c'è la copia di sicurezza e un pulsante per caricare dati di esempio e vedere la dashboard piena.
 
 Altri comandi:
 
@@ -76,11 +76,11 @@ Altri comandi:
 
 5. **Authentication → Sign In / Providers → Email**: lascia attivo l'accesso con email e password. Se non vuoi dover confermare l'email, disattiva *Confirm email*.
 6. **Authentication → URL Configuration**: come *Site URL* metti l'indirizzo dell'app pubblicata (serve per il link "Ho dimenticato la password").
-7. Riavvia `npm run dev`: ora compare la schermata di accesso.
+7. Riavvia `npm run dev`: la pagina di accesso ora usa gli account veri di Supabase (registrazione con nome, email e password, "Ho dimenticato la password" via email).
 
 Se vuoi che nessun altro possa registrarsi, dopo aver creato il tuo account disattiva *Allow new users to sign up*.
 
-I dati che avevi in modalità locale si possono portare nell'account: *Copia di sicurezza* prima dell'accesso, poi *Ripristina da copia* dopo.
+I dati che avevi in modalità locale si possono portare nell'account: *Copia di sicurezza* da Impostazioni (con l'account locale), poi *Ripristina da copia* dopo l'accesso con Supabase.
 
 ## Pubblicarla (Cloudflare Pages)
 
@@ -102,7 +102,7 @@ Le pagine usano indirizzi con `#` (per esempio `/#/dashboard`), quindi non servo
 - Grafici disegnati a mano in SVG (nessuna libreria), stile blu notte, giallo e blu cobalto (ispirato ai colori di Poste Italiane, senza usarne il logo) con tema automatico chiaro/scuro
 
 ```
-src/lib/       regole di calcolo (calc), statistiche (stats), salvataggio (store), festività, dati di esempio
+src/lib/       regole di calcolo (calc), statistiche (stats), salvataggio (store), account locali (accounts), festività, dati di esempio
 src/screens/   Oggi, Calendario, Dashboard, Permessi, Impostazioni, editor di giornata e permesso
 src/components/charts/   grafici (barre, linee, intervalli, mappa dell'anno, barre orizzontali)
 supabase/setup.sql       tabelle e regole di sicurezza
