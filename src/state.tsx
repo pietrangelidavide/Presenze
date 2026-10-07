@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { makeCtx, type Ctx } from './lib/calc';
 import { accountBook } from './lib/accounts';
+import { CloudProfile, EMPTY_PROFILE, LocalProfile, sanitizeAvatar, sanitizeName, type Profile, type ProfileApi } from './lib/profile';
 import { CloudRepo, LocalRepo, sanitizeData, type Repo } from './lib/store';
 import { buildTimeline, type Timeline } from './lib/stats';
 import { supabase } from './lib/supabase';
@@ -16,8 +17,10 @@ export interface Store {
   error: string | null;
   kind: 'local' | 'cloud';
   email: string | null;
-  /** Il nome scelto alla registrazione (se c'è). */
+  /** Il nome da mostrare (quello del profilo, altrimenti quello scelto alla registrazione). */
   name: string | null;
+  /** La foto del profilo (testo "data:image/…"), se c'è. */
+  avatar: string | null;
   data: Data;
   ctx: Ctx;
   tl: Timeline;
@@ -34,6 +37,7 @@ export interface Store {
   saveSettings: (s: Settings) => Promise<boolean>;
   replaceAll: (d: Data) => Promise<boolean>;
   clearAll: () => Promise<boolean>;
+  saveProfile: (patch: Partial<Profile>) => Promise<boolean>;
   signOut: () => Promise<void>;
   reload: () => Promise<void>;
   // finestre
@@ -81,11 +85,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [data, setData] = useState<Data>(() => sanitizeData(null, todayNow()));
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [dayEditor, openDay] = useState<string | null>(null);
   const [permitEditor, openPermit] = useState<{ permit?: Permit; day?: string } | null>(null);
   const repoRef = useRef<Repo | null>(null);
+  const profileRef = useRef<ProfileApi | null>(null);
+  const profileData = useRef<Profile>(EMPTY_PROFILE);
   const dataRef = useRef(data);
   const warnedVolatile = useRef(false);
   dataRef.current = data;
@@ -102,15 +109,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     let uid: string | null = null;
 
-    const start = async (repo: Repo, mail: string | null, id: string | null, who: string | null) => {
+    const start = async (repo: Repo, mail: string | null, id: string | null, who: string | null, prof: ProfileApi | null) => {
       uid = id;
       setBoot('loading');
       try {
-        const d = await repo.load();
+        // Il profilo non è indispensabile: se non si legge, l'app parte lo stesso senza foto.
+        const [d, p] = await Promise.all([repo.load(), prof ? prof.load().catch((): Profile => EMPTY_PROFILE) : Promise.resolve(EMPTY_PROFILE)]);
         if (cancelled) return;
         repoRef.current = repo;
+        profileRef.current = prof;
+        profileData.current = p;
         setEmail(mail);
-        setName(who);
+        setName(p.name ?? who);
+        setAvatar(p.avatar);
         setData(d);
         setBoot('ready');
       } catch (e) {
@@ -126,9 +137,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const sync = () => {
         if (cancelled) return;
         const u = book.session();
-        if (!u) { uid = null; repoRef.current = null; setData(sanitizeData(null, todayNow())); setEmail(null); setName(null); setBoot('auth'); return; }
+        if (!u) { uid = null; repoRef.current = null; profileRef.current = null; setData(sanitizeData(null, todayNow())); setEmail(null); setName(null); setAvatar(null); setBoot('auth'); return; }
         if (u.id === uid) return;
-        void start(new LocalRepo(todayNow, undefined, book.dataKey(u.id)), u.email, u.id, u.name);
+        void start(new LocalRepo(todayNow, undefined, book.dataKey(u.id)), u.email, u.id, u.name, new LocalProfile(book, u.id));
       };
       sync();
       const off = book.subscribe(sync);
@@ -137,14 +148,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const db = supabase;
     void db.auth.getSession().then(({ data: s }) => {
       if (cancelled) return;
-      if (s.session) void start(new CloudRepo(db, s.session.user.id, todayNow), s.session.user.email ?? null, s.session.user.id, userName(s.session.user));
+      if (s.session) void start(new CloudRepo(db, s.session.user.id, todayNow), s.session.user.email ?? null, s.session.user.id, userName(s.session.user), new CloudProfile(db, s.session.user.id));
       else setBoot('auth');
     });
     const { data: sub } = db.auth.onAuthStateChange((evt, session) => {
       if (cancelled) return;
-      if (evt === 'SIGNED_OUT') { uid = null; repoRef.current = null; setData(sanitizeData(null, todayNow())); setBoot('auth'); }
+      if (evt === 'SIGNED_OUT') { uid = null; repoRef.current = null; profileRef.current = null; setData(sanitizeData(null, todayNow())); setName(null); setAvatar(null); setBoot('auth'); }
       else if (session && session.user.id !== uid && (evt === 'SIGNED_IN' || evt === 'INITIAL_SESSION')) {
-        void start(new CloudRepo(db, session.user.id, todayNow), session.user.email ?? null, session.user.id, userName(session.user));
+        void start(new CloudRepo(db, session.user.id, todayNow), session.user.email ?? null, session.user.id, userName(session.user), new CloudProfile(db, session.user.id));
       }
     });
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
@@ -199,14 +210,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast]);
 
+  /** Salva nome e/o foto. Un campo omesso resta com'è; `avatar: null` toglie la foto. */
+  const saveProfile = useCallback(async (patch: Partial<Profile>): Promise<boolean> => {
+    const api = profileRef.current;
+    if (!api) return false;
+    const prev = profileData.current;
+    const next: Profile = {
+      name: patch.name !== undefined ? sanitizeName(patch.name) : prev.name,
+      avatar: patch.avatar !== undefined ? (patch.avatar === null ? null : sanitizeAvatar(patch.avatar)) : prev.avatar,
+    };
+    if (patch.avatar && !next.avatar) { toast('Questa foto non è valida o è troppo grande.', true); return false; }
+    if (patch.name !== undefined && !next.name) { toast('Scrivi il tuo nome.', true); return false; }
+    try {
+      await api.save(next);
+      profileData.current = next;
+      setName(next.name);
+      setAvatar(next.avatar);
+      return true;
+    } catch (e) {
+      toast(`Non sono riuscito a salvare il profilo: ${errText(e)}`, true);
+      return false;
+    }
+  }, [toast]);
+
   const signOut = useCallback(async () => { if (supabase) await supabase.auth.signOut(); else accountBook().signOut(); }, []);
 
   const ctx = useMemo(() => makeCtx(data), [data]);
   const tl = useMemo(() => buildTimeline(ctx, today, 0), [ctx, today]);
 
   const value: Store = {
-    boot, error, kind: supabase ? 'cloud' : 'local', email, name, data, ctx, tl, now, today, nowMin, toasts, toast,
-    saveDay, deleteDay, addPermit, updatePermit, deletePermit, saveSettings, replaceAll, clearAll, signOut, reload,
+    boot, error, kind: supabase ? 'cloud' : 'local', email, name, avatar, data, ctx, tl, now, today, nowMin, toasts, toast,
+    saveDay, deleteDay, addPermit, updatePermit, deletePermit, saveSettings, replaceAll, clearAll, saveProfile, signOut, reload,
     dayEditor, openDay, permitEditor, openPermit,
   };
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

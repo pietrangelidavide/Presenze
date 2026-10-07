@@ -179,6 +179,81 @@ test('giornate prima dell’inizio del conteggio non entrano nel saldo', () => {
   assert.equal(d.balance, 0);
 });
 
+test('smart working senza timbratura: valgono le ore previste del giorno', () => {
+  const c = ctxOf([
+    entry('2026-10-05', { mode: 'smart' }),                       // lunedì passato
+    entry('2026-10-02', { mode: 'smart' }),                       // venerdì passato
+    entry(TODAY, { mode: 'smart' }),                              // oggi
+    entry('2026-10-09', { mode: 'smart' }),                       // venerdì prossimo
+  ]);
+  const mon = dayInfo('2026-10-05', c, TODAY);
+  assert.equal(mon.status, 'done');
+  assert.equal(mon.auto, true);
+  assert.equal(mon.worked, 450);
+  assert.equal(mon.expected, 450);
+  assert.equal(mon.balance, 0);
+  assert.equal(mon.counted, true);
+  assert.equal(mon.inMin, null);
+  assert.equal(dayInfo('2026-10-02', c, TODAY).worked, 360);
+  const today = dayInfo(TODAY, c, TODAY);
+  assert.equal(today.status, 'done');
+  assert.equal(today.auto, true);
+  assert.equal(today.worked, 450);
+  const next = dayInfo('2026-10-09', c, TODAY);
+  assert.equal(next.status, 'planned');
+  assert.equal(next.auto, false);
+  assert.equal(next.worked, 0);
+  assert.equal(next.counted, false);
+});
+
+test('smart working automatico: i permessi riducono le ore, le timbrature vere hanno la precedenza', () => {
+  const c = ctxOf([
+    entry('2026-10-05', { mode: 'smart' }),
+    entry('2026-10-06', { mode: 'smart', clockIn: '09:00', clockOut: '18:00' }),
+    entry('2026-10-07', { mode: 'smart', clockIn: '09:00' }),
+  ], [permit('2026-10-05', 60)]);
+  const a = dayInfo('2026-10-05', c, TODAY);
+  assert.equal(a.worked, 390);
+  assert.equal(a.expected, 390);
+  assert.equal(a.balance, 0);
+  const b = dayInfo('2026-10-06', c, TODAY);
+  assert.equal(b.auto, false);
+  assert.equal(b.worked, 510);
+  assert.equal(b.balance, 60);
+  // oggi con un ingresso e nessuna uscita: è in corso, non automatica
+  assert.equal(dayInfo(TODAY, c, TODAY, 12 * 60).status, 'open');
+  assert.equal(dayInfo(TODAY, c, TODAY, 12 * 60).auto, false);
+});
+
+test('smart working automatico: non vale per sede, weekend, festività e giorni prima del conteggio', () => {
+  const s = { ...settings(), trackingStart: '2026-10-01' };
+  const c = ctxOf([
+    entry('2026-10-05'),                                     // in sede senza orari: da sistemare
+    entry('2026-10-03', { mode: 'smart' }),                  // sabato: nessuna ora prevista
+    entry('2026-09-30', { mode: 'smart' }),                  // prima dell'inizio del conteggio
+    entry('2026-08-15', { mode: 'smart' }),                  // Ferragosto
+  ], [], s);
+  assert.equal(dayInfo('2026-10-05', c, TODAY).status, 'incomplete');
+  assert.equal(dayInfo('2026-10-05', c, TODAY).auto, false);
+  assert.equal(dayInfo('2026-10-03', c, TODAY).auto, false);
+  assert.equal(dayInfo('2026-09-30', c, TODAY).auto, false);
+  assert.equal(dayInfo('2026-08-15', c, TODAY).auto, false);
+});
+
+test('settimana con due giorni di smart senza timbratura: torna a 36 ore', () => {
+  const days = [
+    entry('2026-09-28', { clockIn: '08:30', clockOut: '16:30' }),
+    entry('2026-09-29', { mode: 'smart' }),
+    entry('2026-09-30', { clockIn: '08:30', clockOut: '16:30' }),
+    entry('2026-10-01', { mode: 'smart' }),
+    entry('2026-10-02', { clockIn: '08:30', clockOut: '14:30' }),
+  ];
+  const w = weekSummary(ctxOf(days), '2026-09-30', TODAY);
+  assert.equal(w.worked, 36 * 60);
+  assert.equal(w.smart, 2);
+  assert.equal(w.days.reduce((t, d) => t + d.balance, 0), 0);
+});
+
 test('uscita prima dell’ingresso non vale come giornata completa', () => {
   const c = ctxOf([entry('2026-10-05', { clockIn: '17:00', clockOut: '08:00' })]);
   assert.equal(dayInfo('2026-10-05', c, TODAY).status, 'incomplete');

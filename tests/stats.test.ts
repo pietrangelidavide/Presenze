@@ -323,3 +323,23 @@ test('dati vuoti: tutto a zero, niente NaN', () => {
   assert.equal(records(tl, p).longestDay, null);
   assert.equal(toFix(tl).length, 0);
 });
+
+test('smart working senza timbratura: conta nei totali ma non negli orari medi di ingresso e uscita', () => {
+  const settings = { ...defaultSettings('2026-09-28') };
+  const days: DayEntry[] = [
+    std('2026-09-28'), e('2026-09-29', { mode: 'smart' }), std('2026-09-30'), e('2026-10-01', { mode: 'smart' }), fri('2026-10-02'),
+  ];
+  const tl = buildTimeline(makeCtx({ settings, days, permits: [] } as Data), TODAY, 0);
+  const s = summarize(tl, { kind: 'custom', from: '2026-09-28', to: '2026-10-02', label: 'prova' } as ReturnType<typeof makePeriod>);
+  assert.equal(s.worked, 36 * 60);
+  assert.equal(s.balance, 0);
+  assert.equal(s.daysDone, 5);
+  assert.equal(s.daysSmart, 2);
+  assert.equal(s.daysOffice, 3);
+  assert.equal(s.incomplete + s.missing, 0);
+  assert.equal(s.avgIn, 8 * 60 + 30);          // solo le tre giornate con orari veri
+  assert.equal(s.avgOut, (16 * 60 + 30 + 16 * 60 + 30 + 14 * 60 + 30) / 3);
+  const csv = csvDays(tl, '2026-09-29', '2026-09-29');
+  assert.ok(csv.includes('Automatica (smart senza timbratura)'));
+  assert.ok(csv.includes('7:30'));
+});

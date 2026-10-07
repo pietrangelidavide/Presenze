@@ -47,6 +47,7 @@ export function Heatmap({ cells, today, ariaLabel }: { cells: HeatCell[]; today:
     const i = cell.info;
     const rows: TipRow[] = [{ label: 'Stato', value: i.mode ? MODE_LABEL[i.mode] : i.holiday ?? STATUS_LABEL[i.status] }];
     if (cell.worked > 0) rows.push({ label: 'Ore nette', value: dur(cell.worked) });
+    if (i.auto) rows.push({ label: 'Ore', value: 'Previste, in automatico' });
     if (i.entry?.clockIn) rows.push({ label: 'Orario', value: `${i.entry.clockIn}${i.entry.clockOut ? ` → ${i.entry.clockOut}` : ''}` });
     if (i.counted && (i.status === 'done' || i.status === 'incomplete')) rows.push({ label: 'Saldo', value: i.balance === 0 ? '0h' : durSigned(i.balance) });
     if (i.permitMin) rows.push({ label: 'Permessi', value: dur(i.permitMin) });

@@ -140,6 +140,26 @@ function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onEnd
     );
   }
 
+  if (info.status === 'done' && info.auto) {
+    return (
+      <section className="card glass hero" aria-label="Smart working in automatico">
+        <div className="hero-top">
+          <div><div className="hero-label">Smart working</div><div className="hero-big num">{dur(info.worked)}</div></div>
+          <span className="badge"><ModeDot mode="smart" /> Ore previste</span>
+        </div>
+        <div className="hero-meta">
+          <span>Senza timbratura contiamo in automatico le ore previste di oggi.</span>
+          <span>Saldo di oggi <b className="num">{durSigned(info.balance)}</b></span>
+          {info.permitMin ? <span>Permessi di oggi <b className="num">{dur(info.permitMin)}</b></span> : null}
+        </div>
+        <div className="hero-actions">
+          <button type="button" className="btn primary lg" onClick={onStart}><Icon name="play" size={18} /> Timbra comunque</button>
+          <button type="button" className="btn" onClick={() => s.openDay(today)}><Icon name="edit" size={18} /> Modifica</button>
+        </div>
+      </section>
+    );
+  }
+
   if (info.status === 'done') {
     return (
       <section className="card glass hero" aria-label="Giornata chiusa">

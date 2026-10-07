@@ -98,6 +98,12 @@ export class AccountBook {
 
   count(): number { return this.accounts().length; }
 
+  /** I dati pubblici di un account, se esiste su questo dispositivo. */
+  user(id: string): LocalUser | null {
+    const a = this.accounts().find((x) => x.id === id);
+    return a ? { id: a.id, name: a.name, email: a.email } : null;
+  }
+
   session(): LocalUser | null {
     const id = this.get(SESSION_KEY);
     if (!id) return null;
@@ -150,6 +156,29 @@ export class AccountBook {
   signOut(): void {
     this.del(SESSION_KEY);
     this.emit();
+  }
+
+  // ── profilo: nome e foto ──
+  private avatarKey(userId: string): string { return `presenze.avatar.v1.${userId}`; }
+
+  /** La foto dell'account (testo "data:image/…"), se c'è. */
+  avatar(userId: string): string | null { return this.get(this.avatarKey(userId)); }
+
+  /** Cambia nome e/o foto. `avatar: null` la toglie; un campo omesso resta com'è. */
+  updateProfile(userId: string, patch: { name?: string | null; avatar?: string | null }): void {
+    const list = this.accounts();
+    const i = list.findIndex((a) => a.id === userId);
+    if (i < 0) throw new AuthError('Account non trovato su questo dispositivo.');
+    if (patch.name !== undefined) {
+      const name = (patch.name ?? '').trim().replace(/\s+/g, ' ').slice(0, 60);
+      if (!name) throw new AuthError('Scrivi il tuo nome.');
+      list[i] = { ...list[i], name };
+      this.set(BOOK_KEY, JSON.stringify(list));
+    }
+    if (patch.avatar !== undefined) {
+      if (patch.avatar) this.set(this.avatarKey(userId), patch.avatar);
+      else this.del(this.avatarKey(userId));
+    }
   }
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { Mode } from './lib/types';
+import { initials } from './lib/profile';
 import { MODE_LABEL } from './lib/types';
 
 // ── icone (24×24, tratto) ──
@@ -38,6 +39,8 @@ const PATHS: Record<string, string> = {
   moon: 'M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z',
   auto: 'M12 3a9 9 0 100 18V3z',
   note: 'M5 4h14v16H5zM8.5 9h7M8.5 13h7M8.5 17h4',
+  camera: 'M4 8h3l1.5-2h7L17 8h3v11H4zM12 11a3.2 3.2 0 100 6.4 3.2 3.2 0 000-6.4z',
+  user: 'M12 4a4 4 0 100 8 4 4 0 000-8zM4.5 20a7.5 7.5 0 0115 0',
 };
 
 export type IconName = keyof typeof PATHS;
@@ -123,5 +126,14 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
         <button key={o.value} type="button" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>{o.label}</button>
       ))}
     </div>
+  );
+}
+
+/** Foto del profilo, rotonda. Senza foto mostra le iniziali. Da sola è decorativa: il nome va scritto accanto o nell'etichetta del pulsante. */
+export function Avatar({ src, name, email, size = 40, className = '' }: { src: string | null | undefined; name?: string | null; email?: string | null; size?: number; className?: string }) {
+  return (
+    <span className={`avatar ${className}`} style={{ width: size, height: size, fontSize: Math.max(11, Math.round(size * 0.38)) }} aria-hidden="true">
+      {src ? <img src={src} alt="" draggable={false} /> : initials(name, email)}
+    </span>
   );
 }

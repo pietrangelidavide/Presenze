@@ -19,6 +19,7 @@ Funziona su telefono e computer, segue il tema chiaro/scuro del dispositivo (o l
   - record del periodo e tabella settimana per settimana
   - ogni grafico ha la vista **tabella** e si esplora anche con la tastiera (frecce)
   - esportazione **CSV** di giornate e permessi
+- **Profilo**: foto come sui social (la scegli dalla galleria o la scatti, poi la sposti e la ingrandisci), nome e qualche numero. La foto resta visibile in alto in ogni schermata (nella barra laterale sul computer).
 - **Impostazioni**: orario settimanale, limite smart working, monte permessi, festività nazionali, data di inizio conteggio, saldo di partenza, tema, copia di sicurezza (JSON) e ripristino.
 
 ## Come si calcolano le ore
@@ -34,6 +35,7 @@ Orario di partenza: **36 ore nette a settimana**.
 
 - La pausa pranzo prevista si toglie in automatico dalle giornate di almeno 6 ore di presenza; in ogni giornata si può scegliere una pausa diversa.
 - Ore nette = uscita − ingresso − pausa. Saldo del giorno = ore nette − ore previste (meno i permessi).
+- **Smart working senza timbratura**: se segni un giorno di smart working e non metti né ingresso né uscita, per quel giorno contano in automatico le ore previste (7h30 dal lunedì al giovedì, 6h il venerdì, meno i permessi), con saldo zero. Se timbri o inserisci gli orari, valgono quelli. I giorni futuri restano solo pianificati finché non arrivano.
 - Ferie, malattia e festività non richiedono ore. Le festività nazionali italiane (con Pasquetta) sono incluse e si possono disattivare.
 - La **banca ore** è il saldo di partenza più la somma dei saldi di tutte le giornate concluse. Le giornate passate senza orari contano come ore mancanti finché non vengono completate (compaiono in "Da sistemare").
 - Il limite di smart working è controllato dall'app (avviso), non dal database.
@@ -61,7 +63,7 @@ Altri comandi:
 ## Usarla su telefono e computer con gli stessi dati (Supabase)
 
 1. Crea un progetto gratuito su [supabase.com](https://supabase.com).
-2. **SQL Editor** → incolla tutto il contenuto di `supabase/setup.sql` → **Run**. Si può rilanciare senza danni. Ogni persona vede solo i propri dati (Row Level Security).
+2. **SQL Editor** → incolla tutto il contenuto di `supabase/setup.sql` → **Run**. Si può rilanciare senza danni (rilancialo dopo ogni aggiornamento dell'app: ora crea anche la tabella del profilo). Ogni persona vede solo i propri dati (Row Level Security).
 3. **Project Settings → API**: copia *Project URL* e la chiave *anon public*.
 4. Copia `.env.example` in `.env` e compila:
 

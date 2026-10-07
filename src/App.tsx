@@ -5,13 +5,14 @@ import { Dashboard } from './screens/Dashboard';
 import { DayEditor } from './screens/DayEditor';
 import { PermitEditor } from './screens/PermitEditor';
 import { Permits } from './screens/Permits';
+import { Profile } from './screens/Profile';
 import { Settings } from './screens/Settings';
 import { Today } from './screens/Today';
 import { hasSupabase } from './lib/supabase';
 import { onLinkClick, useRoute } from './route';
 import { AppProvider, useStore } from './state';
 import { useThemePref, type ThemePref } from './theme';
-import { Icon } from './ui';
+import { Avatar, Icon } from './ui';
 
 const ROUTES = [
   { id: 'oggi', label: 'Oggi', icon: 'today' },
@@ -49,23 +50,31 @@ function Shell() {
     case 'dashboard': screen = <Dashboard />; break;
     case 'permessi': screen = <Permits />; break;
     case 'impostazioni': screen = <Settings />; break;
+    case 'profilo': screen = <Profile />; break;
     default: screen = <Today />;
   }
 
   return (
     <div className="app">
+      <header className="topbar">
+        <a href="#/oggi" onClick={onLinkClick('oggi')} className="topbar-brand"><span className="brand-mark"><Icon name="clock" size={18} /></span>Presenze</a>
+        <a href="#/profilo" onClick={onLinkClick('profilo')} className="topbar-me" aria-label={`Il tuo profilo${s.name ? `: ${s.name}` : ''}`} aria-current={route === 'profilo' ? 'page' : undefined}>
+          <Avatar src={s.avatar} name={s.name} email={s.email} size={38} />
+        </a>
+      </header>
+
       <nav className="rail" aria-label="Navigazione principale">
         <div className="brand"><span className="brand-mark"><Icon name="clock" size={20} /></span><span>Presenze<small>Le tue ore di lavoro</small></span></div>
+        <a href="#/profilo" onClick={onLinkClick('profilo')} className="rail-me" aria-current={route === 'profilo' ? 'page' : undefined}>
+          <Avatar src={s.avatar} name={s.name} email={s.email} size={46} />
+          <span className="rail-me-text"><b>{s.name || s.email}</b><small>Il tuo profilo</small></span>
+        </a>
         {ROUTES.map((r) => (
           <a key={r.id} href={`#/${r.id}`} onClick={onLinkClick(r.id)} className="navlink" aria-current={route === r.id ? 'page' : undefined}><Icon name={r.icon} /> {r.label}</a>
         ))}
         <div className="rail-foot">
           <button type="button" className="btn sm ghost" onClick={() => setTheme(NEXT_THEME[theme])} aria-label={`${THEME_LABEL[theme]}: cambia`}><Icon name={THEME_ICON[theme]} size={16} /> {THEME_LABEL[theme]}</button>
-          <span className="muted" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {s.name ? <b style={{ display: 'block', color: 'var(--text)' }}>{s.name}</b> : null}
-            {s.email}
-            {!hasSupabase ? <span style={{ display: 'block' }}>I dati restano in questo browser.</span> : null}
-          </span>
+          {!hasSupabase ? <span className="muted" style={{ fontSize: 12.5 }}>I dati restano in questo browser.</span> : null}
         </div>
       </nav>
 

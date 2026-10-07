@@ -53,6 +53,15 @@ create table if not exists public.presenze_permits (
 );
 create index if not exists presenze_permits_user_day on public.presenze_permits (user_id, day);
 
+-- ── Profilo: nome e foto (una riga per persona) ─────────────────────────────
+-- La foto è una piccola immagine JPEG (circa 320 px) salvata come testo "data:image/jpeg;base64,…".
+create table if not exists public.presenze_profiles (
+  user_id      uuid primary key default auth.uid() references auth.users (id) on delete cascade,
+  display_name text check (display_name is null or char_length(display_name) between 1 and 60),
+  avatar       text check (avatar is null or (char_length(avatar) <= 200000 and avatar ~ '^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$')),
+  updated_at   timestamptz not null default now()
+);
+
 -- ── Data dell'ultima modifica ───────────────────────────────────────────────
 create or replace function public.presenze_touch() returns trigger
 language plpgsql as $$
@@ -65,6 +74,10 @@ drop trigger if exists presenze_settings_touch on public.presenze_settings;
 create trigger presenze_settings_touch before update on public.presenze_settings
   for each row execute function public.presenze_touch();
 
+drop trigger if exists presenze_profiles_touch on public.presenze_profiles;
+create trigger presenze_profiles_touch before update on public.presenze_profiles
+  for each row execute function public.presenze_touch();
+
 drop trigger if exists presenze_days_touch on public.presenze_days;
 create trigger presenze_days_touch before update on public.presenze_days
   for each row execute function public.presenze_touch();
@@ -73,6 +86,7 @@ create trigger presenze_days_touch before update on public.presenze_days
 alter table public.presenze_settings enable row level security;
 alter table public.presenze_days     enable row level security;
 alter table public.presenze_permits  enable row level security;
+alter table public.presenze_profiles enable row level security;
 
 drop policy if exists presenze_settings_own on public.presenze_settings;
 create policy presenze_settings_own on public.presenze_settings
@@ -82,10 +96,14 @@ drop policy if exists presenze_days_own on public.presenze_days;
 create policy presenze_days_own on public.presenze_days
   for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+drop policy if exists presenze_profiles_own on public.presenze_profiles;
+create policy presenze_profiles_own on public.presenze_profiles
+  for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
 drop policy if exists presenze_permits_own on public.presenze_permits;
 create policy presenze_permits_own on public.presenze_permits
   for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- Permessi di accesso alle API: solo chi ha fatto l'accesso, mai in modo anonimo
-revoke all on public.presenze_settings, public.presenze_days, public.presenze_permits from anon;
-grant select, insert, update, delete on public.presenze_settings, public.presenze_days, public.presenze_permits to authenticated;
+revoke all on public.presenze_settings, public.presenze_days, public.presenze_permits, public.presenze_profiles from anon;
+grant select, insert, update, delete on public.presenze_settings, public.presenze_days, public.presenze_permits, public.presenze_profiles to authenticated;

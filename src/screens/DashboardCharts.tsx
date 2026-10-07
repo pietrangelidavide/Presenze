@@ -41,6 +41,7 @@ export function DashboardCharts({ tl, period }: { tl: Timeline; period: Period }
       const d = tl.get(b.from);
       if (d.mode) rows.push({ label: 'Tipo', value: MODE_LABEL[d.mode] });
       else if (d.holiday) rows.push({ label: 'Festività', value: d.holiday });
+      if (d.auto) rows.push({ label: 'Ore', value: 'Previste, in automatico' });
       if (d.entry?.clockIn) rows.push({ label: 'Orario', value: `${d.entry.clockIn}${d.entry.clockOut ? `–${d.entry.clockOut}` : ''}` });
       if (d.permitMin) rows.push({ label: 'Permessi', value: dur(d.permitMin) });
       if (d.status === 'missing' || d.status === 'incomplete') rows.push({ label: 'Stato', value: STATUS_LABEL[d.status] });

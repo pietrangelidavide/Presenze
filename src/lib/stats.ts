@@ -542,7 +542,7 @@ export function csvDays(tl: Timeline, from: string, to: string): string {
     const d = tl.get(day);
     if (d.status === 'rest' && !d.entry && d.permitMin === 0) continue;
     lines.push(csvLine([
-      day, WEEKDAY_LONG[d.wd - 1], STATUS_LABEL[d.status], d.mode ? MODE_CSV[d.mode] : (d.holiday ?? ''),
+      day, WEEKDAY_LONG[d.wd - 1], d.auto ? 'Automatica (smart senza timbratura)' : STATUS_LABEL[d.status], d.mode ? MODE_CSV[d.mode] : (d.holiday ?? ''),
       d.entry?.clockIn ?? '', d.entry?.clockOut ?? '',
       d.status === 'done' ? d.breakMin : '', d.status === 'done' ? hm(d.worked) : '', d.expected ? hm(d.expected) : '',
       d.permitMin || '', d.counted ? d.balance : '', tl.cum(day), d.entry?.note ?? '',

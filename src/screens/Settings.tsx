@@ -6,6 +6,7 @@ import { exportJson, parseImport } from '../lib/store';
 import { csvDays, csvPermits } from '../lib/stats';
 import { dur, durField, isYmd, parseDur, WEEKDAY_LONG } from '../lib/time';
 import type { Settings as SettingsT } from '../lib/types';
+import { onLinkClick } from '../route';
 import { useStore } from '../state';
 import { setThemePref, useThemePref, type ThemePref } from '../theme';
 import { Icon, Segmented, Toggle } from '../ui';
@@ -180,7 +181,7 @@ export function Settings() {
       <section className="card" aria-label="Account">
         <div className="card-head"><div><h2>Account</h2></div></div>
         <div className="stack" style={{ gap: 10 }}>
-          <div className="row wrap"><span style={{ flex: 1, minWidth: 0 }}>Accesso come <b>{s.name ? `${s.name} · ${s.email}` : s.email}</b></span><button type="button" className="btn sm" onClick={() => void s.signOut()}><Icon name="logout" size={16} /> Esci</button></div>
+          <div className="row wrap"><span style={{ flex: 1, minWidth: 0 }}>Accesso come <b>{s.name ? `${s.name} · ${s.email}` : s.email}</b></span><a className="btn sm" href="#/profilo" onClick={onLinkClick('profilo')}><Icon name="user" size={16} /> Profilo</a><button type="button" className="btn sm" onClick={() => void s.signOut()}><Icon name="logout" size={16} /> Esci</button></div>
           {s.kind === 'local' ? <p className="muted">Questo account vive solo in questo browser: i dati non si sincronizzano con altri dispositivi. Per usare lo stesso account su telefono e computer collega Supabase (guida nel file README).</p> : null}
         </div>
       </section>

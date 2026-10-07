@@ -13,24 +13,24 @@ function DotRing({ cx, cy, r, spokes, color, opacity, size }: { cx: number; cy: 
 const spokesAt = (r: number): number => (r < 300 ? 36 : r < 700 ? 72 : 144);
 
 /** Trama a tutto schermo: una griglia di puntini e, in alto a destra, un quadrante d'orologio fatto di anelli di puntini. */
-export function Backdrop() {
+export function Backdrop({ className = 'auth-art', align = 'mid' }: { className?: string; align?: 'mid' | 'top' }) {
   const A = { x: 880, y: 250 };
   const rings: number[] = [];
   for (let r = 44; r < 1500; r += 52) if (Math.abs(r - 304) > 30 && Math.abs(r - 382) > 28) rings.push(r);
   const c304 = 2 * Math.PI * 304, c382 = 2 * Math.PI * 382;
   return (
-    <svg className="auth-art" viewBox="0 0 1200 1200" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+    <svg className={className} viewBox="0 0 1200 1200" preserveAspectRatio={align === 'top' ? 'xMidYMin slice' : 'xMidYMid slice'} aria-hidden="true" focusable="false">
       <defs>
-        <pattern id="auth-grid" width="30" height="30" patternUnits="userSpaceOnUse"><circle cx="15" cy="15" r="2.2" fill="#9DB2F2" /></pattern>
-        <radialGradient id="auth-fade" gradientUnits="userSpaceOnUse" cx={A.x} cy={A.y} r="1350">
+        <pattern id={`${className}-grid`} width="30" height="30" patternUnits="userSpaceOnUse"><circle cx="15" cy="15" r="2.2" fill="#9DB2F2" /></pattern>
+        <radialGradient id={`${className}-fade`} gradientUnits="userSpaceOnUse" cx={A.x} cy={A.y} r="1350">
           <stop offset="0" stopColor="#fff" stopOpacity="1" />
           <stop offset="0.7" stopColor="#fff" stopOpacity="0.55" />
           <stop offset="1" stopColor="#fff" stopOpacity="0.1" />
         </radialGradient>
-        <mask id="auth-mask"><rect width="1200" height="1200" fill="url(#auth-fade)" /></mask>
+        <mask id={`${className}-mask`}><rect width="1200" height="1200" fill={`url(#${className}-fade)`} /></mask>
       </defs>
-      <rect width="1200" height="1200" fill="url(#auth-grid)" opacity="0.4" />
-      <g mask="url(#auth-mask)">
+      <rect width="1200" height="1200" fill={`url(#${className}-grid)`} opacity="0.4" />
+      <g mask={`url(#${className}-mask)`}>
         {rings.map((r) => <DotRing key={r} cx={A.x} cy={A.y} r={r} spokes={spokesAt(r)} color="#F1E54C" opacity={0.95} size={Math.max(3.6, 9 - r / 200)} />)}
         <circle cx={A.x} cy={A.y} r={304} fill="none" stroke="#fff" strokeOpacity="0.7" strokeWidth="12" strokeDasharray={`1.8 ${(c304 / 60 - 1.8).toFixed(3)}`} />
         <circle cx={A.x} cy={A.y} r={304} fill="none" stroke="#fff" strokeOpacity="0.95" strokeWidth="26" strokeDasharray={`3.2 ${(c304 / 12 - 3.2).toFixed(3)}`} />
