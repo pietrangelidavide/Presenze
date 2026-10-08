@@ -271,7 +271,21 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .auth > .card { width: min(420px, 100%); display: grid; gap: 14px; color: var(--text); }
 .auth-art { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -2; pointer-events: none; }
 .auth::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 62% 58% at 50% 48%, color-mix(in srgb, var(--auth-b) 88%, transparent), transparent); }
-.auth-wrap { width: min(420px, 100%); display: grid; gap: 18px; }
+.auth-grid { width: min(420px, 100%); display: grid; gap: 4px; }
+.auth-hero { display: grid; justify-items: center; }
+.scene { height: clamp(150px, 25dvh, 232px); width: auto; max-width: 100%; overflow: visible; filter: drop-shadow(0 18px 28px rgba(5, 8, 30, 0.35)); }
+.scene-float { animation: scene-float 7s ease-in-out infinite; }
+@keyframes scene-float { 50% { transform: translateY(-9px); } }
+.auth-pitch { display: none; text-shadow: 0 0 18px var(--auth-b), 0 0 5px var(--auth-b); }
+.auth-pitch h2 { font-size: clamp(30px, 3.4vw, 42px); font-weight: 680; letter-spacing: -0.025em; line-height: 1.08; text-wrap: balance; }
+.auth-pitch p { margin-top: 12px; max-width: 34ch; font-size: 17px; line-height: 1.5; color: rgba(255, 255, 255, 0.84); text-wrap: pretty; }
+.auth-wrap { width: 100%; display: grid; gap: 18px; }
+@media (min-width: 900px) {
+  .auth-grid { width: min(1080px, 100%); grid-template-columns: minmax(0, 1fr) 420px; gap: 64px; align-items: center; }
+  .auth-hero { justify-items: start; gap: 8px; }
+  .scene { height: clamp(260px, calc(100dvh - 270px), 560px); width: auto; max-width: 100%; }
+  .auth-pitch { display: block; }
+}
 .auth-brand { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 650; letter-spacing: -0.01em;  text-shadow: 0 0 14px var(--auth-b), 0 0 4px var(--auth-b); }
 .auth-brand .brand-mark { width: 40px; height: 40px; border-radius: 12px; }
 .auth-brand small { display: block; font-size: 12.5px; font-weight: 500; color: rgba(255, 255, 255, 0.78); letter-spacing: 0; margin-top: -1px; }

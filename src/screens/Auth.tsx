@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { AuthError, MIN_PASSWORD, accountBook, validEmail } from '../lib/accounts';
 import { supabase } from '../lib/supabase';
 import { Icon } from '../ui';
+import { Scene } from './Scene';
 
 /** Anello di puntini: un solo cerchio tratteggiato con i capi arrotondati. I puntini sono in file radiali, come i raggi di un quadrante. */
 function DotRing({ cx, cy, r, spokes, color, opacity, size }: { cx: number; cy: number; r: number; spokes: number; color: string; opacity: number; size: number }) {
@@ -128,6 +129,14 @@ export function Auth() {
   return (
     <main className="auth">
       <Backdrop />
+      <div className="auth-grid">
+      <section className="auth-hero" aria-label="Presentazione">
+        <Scene />
+        <div className="auth-pitch">
+          <h2>Le tue ore, in ordine.</h2>
+          <p>Entrata, uscita, pausa e permessi: vedi subito quanto ti manca per chiudere la settimana.</p>
+        </div>
+      </section>
       <div className="auth-wrap">
         <header className="auth-brand">
           <span className="brand-mark"><Icon name="clock" size={22} /></span>
@@ -186,6 +195,7 @@ export function Auth() {
               : 'Anteprima: gli account e i dati restano in questo browser e non vengono inviati altrove. Non usare una password che usi per altri servizi.')
             : 'Ogni persona vede solo i propri dati.'}
         </p>
+      </div>
       </div>
     </main>
   );
