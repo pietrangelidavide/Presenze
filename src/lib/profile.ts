@@ -61,7 +61,8 @@ export function zoomAround(natW: number, natH: number, view: number, from: Crop,
 // ───────────────────────── salvataggio ─────────────────────────
 export interface ProfileApi {
   load(): Promise<Profile>;
-  save(p: Profile): Promise<void>;
+  /** `p` è il profilo completo da salvare; `changed` dice cosa è stato toccato davvero. */
+  save(p: Profile, changed?: Partial<Profile>): Promise<void>;
 }
 
 /** Account locali: il nome sta nell'account, la foto in una voce a parte. */
@@ -70,8 +71,12 @@ export class LocalProfile implements ProfileApi {
   async load(): Promise<Profile> {
     return { name: sanitizeName(this.book.user(this.userId)?.name), avatar: sanitizeAvatar(this.book.avatar(this.userId)) };
   }
-  async save(p: Profile): Promise<void> {
-    this.book.updateProfile(this.userId, { name: p.name, avatar: p.avatar });
+  async save(p: Profile, changed: Partial<Profile> = p): Promise<void> {
+    // Si scrive solo ciò che è cambiato: salvare la foto non deve toccare (né cercare) l'account.
+    const patch: { name?: string | null; avatar?: string | null } = {};
+    if (changed.name !== undefined) patch.name = p.name;
+    if (changed.avatar !== undefined) patch.avatar = p.avatar;
+    this.book.updateProfile(this.userId, patch);
   }
 }
 

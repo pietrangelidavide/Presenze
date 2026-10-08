@@ -27,7 +27,7 @@ function scenario() {
     std('2026-10-05'), e('2026-10-06', { clockIn: '08:30' }),
   ];
   const permits = [permit('2026-09-29', 60, { reason: 'medical' })];
-  const data: Data = { settings, days, permits };
+  const data: Data = { settings, days, permits, team: [] };
   return buildTimeline(makeCtx(data), TODAY, 0);
 }
 
@@ -218,7 +218,7 @@ test('permessi: totali, motivi, monte annuo', () => {
     permit('2026-05-05', 90, { reason: 'medical' }),
     permit('2025-12-30', 480),
   ];
-  const tl = buildTimeline(makeCtx({ settings, days: [], permits }), TODAY, 0);
+  const tl = buildTimeline(makeCtx({ settings, days: [], permits, team: [] }), TODAY, 0);
   const s = permitStats(tl.ctx, makePeriod('year', TODAY, tl));
   assert.equal(s.total, 270);
   assert.equal(s.count, 3);
@@ -229,7 +229,7 @@ test('permessi: totali, motivi, monte annuo', () => {
   assert.deepEqual(s.allowance, { year: 2026, used: 270, limit: 600, left: 330 });
   const prev = permitStats(tl.ctx, makePeriod('year', '2025-06-01', tl));
   assert.equal(prev.allowance?.used, 480);
-  assert.equal(permitStats(makeCtx({ settings: defaultSettings('2026-01-01'), days: [], permits }), makePeriod('year', TODAY, tl)).allowance, null);
+  assert.equal(permitStats(makeCtx({ settings: defaultSettings('2026-01-01'), days: [], permits, team: [] }), makePeriod('year', TODAY, tl)).allowance, null);
 });
 
 test('tabella settimane', () => {
@@ -297,7 +297,7 @@ test('CSV: intestazioni, BOM, separatore e virgolette', () => {
   assert.equal(lines.length, 1 + 7); // lun–ven + lun/mar della settimana dopo (weekend vuoto escluso)
   assert.match(lines[1], /^2026-09-21;Lunedì;Completa;In sede;08:00;17:00;30;8:30;7:30;;60;/);
   assert.match(lines[5], /;Ferie;/);
-  const withNote = buildTimeline(makeCtx({ settings: defaultSettings('2026-01-01'), days: [e('2026-10-05', { clockIn: '09:00', clockOut: '17:00', note: 'riunione; "urgente"' })], permits: [permit('2026-10-05', 30, { note: 'a;b' })] }), TODAY, 0);
+  const withNote = buildTimeline(makeCtx({ settings: defaultSettings('2026-01-01'), days: [e('2026-10-05', { clockIn: '09:00', clockOut: '17:00', note: 'riunione; "urgente"' })], permits: [permit('2026-10-05', 30, { note: 'a;b' })], team: [] }), TODAY, 0);
   assert.match(csvDays(withNote, '2026-10-05', '2026-10-05'), /"riunione; ""urgente"""/);
   const pc = csvPermits(withNote.ctx, '2026-01-01', '2026-12-31');
   assert.match(pc, /^﻿Data;Giorno;Dalle;Durata \(min\);Durata;Motivo;Note\r\n2026-10-05;Lunedì;;30;30′;Personale;"a;b"\r\n$/);
@@ -315,7 +315,7 @@ test('periodo nel futuro: nessun conteggio, nessun errore', () => {
 });
 
 test('dati vuoti: tutto a zero, niente NaN', () => {
-  const tl = buildTimeline(makeCtx({ settings: defaultSettings(TODAY), days: [], permits: [] }), TODAY, 0);
+  const tl = buildTimeline(makeCtx({ settings: defaultSettings(TODAY), days: [], permits: [], team: [] }), TODAY, 0);
   const p = makePeriod('all', TODAY, tl);
   const s = summarize(tl, p);
   for (const [k, v] of Object.entries(s)) if (typeof v === 'number') assert.ok(Number.isFinite(v), k);
@@ -329,7 +329,7 @@ test('smart working senza timbratura: conta nei totali ma non negli orari medi d
   const days: DayEntry[] = [
     std('2026-09-28'), e('2026-09-29', { mode: 'smart' }), std('2026-09-30'), e('2026-10-01', { mode: 'smart' }), fri('2026-10-02'),
   ];
-  const tl = buildTimeline(makeCtx({ settings, days, permits: [] } as Data), TODAY, 0);
+  const tl = buildTimeline(makeCtx({ settings, days, permits: [], team: [] } as Data), TODAY, 0);
   const s = summarize(tl, { kind: 'custom', from: '2026-09-28', to: '2026-10-02', label: 'prova' } as ReturnType<typeof makePeriod>);
   assert.equal(s.worked, 36 * 60);
   assert.equal(s.balance, 0);

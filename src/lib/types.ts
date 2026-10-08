@@ -39,10 +39,23 @@ export interface Settings {
   nationalHolidays: boolean;           // festività nazionali italiane
 }
 
+/** Livello di una persona del team. */
+export type TeamLevel = 'capo' | 'senior' | 'junior';
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  level: TeamLevel;
+  role: string | null;      // mansione, per esempio "Analista antifrode"
+  contact: string | null;   // email o telefono, scritti come testo libero
+  note: string | null;
+}
+
 export interface Data {
   settings: Settings;
   days: DayEntry[];
   permits: Permit[];
+  team: TeamMember[];
 }
 
 export const MODE_LABEL: Record<Mode, string> = {
@@ -60,3 +73,20 @@ export const REASON_LABEL: Record<Reason, string> = {
   study: 'Studio',
   other: 'Altro',
 };
+
+/** Dal livello più alto al più basso: è l'ordine in cui il team viene mostrato. */
+export const LEVEL_ORDER: TeamLevel[] = ['capo', 'senior', 'junior'];
+
+export const LEVEL_LABEL: Record<TeamLevel, string> = {
+  capo: 'Capo',
+  senior: 'Senior',
+  junior: 'Junior',
+};
+
+export const LEVEL_HINT: Record<TeamLevel, string> = {
+  capo: 'Guida il team e decide le priorità',
+  senior: 'Lavora in autonomia e affianca i junior',
+  junior: 'Sta crescendo, lavora con una guida',
+};
+
+export const TEAM_MAX = 200;

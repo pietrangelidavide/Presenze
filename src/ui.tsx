@@ -41,6 +41,7 @@ const PATHS: Record<string, string> = {
   note: 'M5 4h14v16H5zM8.5 9h7M8.5 13h7M8.5 17h4',
   camera: 'M4 8h3l1.5-2h7L17 8h3v11H4zM12 11a3.2 3.2 0 100 6.4 3.2 3.2 0 000-6.4z',
   user: 'M12 4a4 4 0 100 8 4 4 0 000-8zM4.5 20a7.5 7.5 0 0115 0',
+  team: 'M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM2.5 20a6.5 6.5 0 0113 0M16 4.4a3.5 3.5 0 010 6.7M18 14.3a6.5 6.5 0 013.5 5.7',
 };
 
 export type IconName = keyof typeof PATHS;

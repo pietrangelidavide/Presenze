@@ -61,7 +61,10 @@ function browserStorage(): Box | null {
 export class AccountBook {
   /** Vero se il browser non conserva i dati: gli account durano solo finché la pagina è aperta. */
   volatile = false;
+  /** Copia in memoria di ciò che questa pagina ha scritto o letto: serve quando il browser non conserva (o perde) i dati. */
   private mem = new Map<string, string>();
+  /** Voci la cui ultima scrittura nel browser non è andata a buon fine: la versione giusta è solo in memoria. */
+  private unsaved = new Set<string>();
   private listeners = new Set<() => void>();
 
   constructor(private storage: Box | null = browserStorage()) {
@@ -72,16 +75,29 @@ export class AccountBook {
   }
 
   private get(key: string): string | null {
-    if (this.storage) { try { return this.storage.getItem(key); } catch { /* si usa la memoria */ } }
+    if (this.unsaved.has(key) && this.mem.has(key)) return this.mem.get(key) ?? null;
+    if (this.storage) {
+      try {
+        const v = this.storage.getItem(key);
+        if (v !== null) {
+          // L'elenco degli account lo teniamo anche in memoria: se il browser lo perde mentre l'app è aperta, non si resta senza account.
+          if (key === BOOK_KEY) this.mem.set(key, v);
+          return v;
+        }
+        // Il browser non ce l'ha (più): vale la copia fatta in questa sessione, se c'è.
+        return this.mem.get(key) ?? null;
+      } catch { /* si usa la memoria */ }
+    }
     return this.mem.get(key) ?? null;
   }
   private set(key: string, value: string): void {
     this.mem.set(key, value);
-    if (!this.storage) { this.volatile = true; return; }
-    try { this.storage.setItem(key, value); } catch { this.volatile = true; }
+    if (!this.storage) { this.volatile = true; this.unsaved.add(key); return; }
+    try { this.storage.setItem(key, value); this.unsaved.delete(key); } catch { this.volatile = true; this.unsaved.add(key); }
   }
   private del(key: string): void {
     this.mem.delete(key);
+    this.unsaved.delete(key);
     try { this.storage?.removeItem(key); } catch { /* niente */ }
   }
 
@@ -164,16 +180,23 @@ export class AccountBook {
   /** La foto dell'account (testo "data:image/…"), se c'è. */
   avatar(userId: string): string | null { return this.get(this.avatarKey(userId)); }
 
-  /** Cambia nome e/o foto. `avatar: null` la toglie; un campo omesso resta com'è. */
+  /**
+   * Cambia nome e/o foto. `avatar: null` la toglie; un campo omesso resta com'è.
+   * La foto sta in una voce sua e non ha bisogno di rileggere l'elenco degli account;
+   * solo il nome, che vive dentro l'account, richiede di ritrovarlo.
+   */
   updateProfile(userId: string, patch: { name?: string | null; avatar?: string | null }): void {
-    const list = this.accounts();
-    const i = list.findIndex((a) => a.id === userId);
-    if (i < 0) throw new AuthError('Account non trovato su questo dispositivo.');
+    if (!userId) throw new AuthError('Account non trovato su questo dispositivo.');
     if (patch.name !== undefined) {
       const name = (patch.name ?? '').trim().replace(/\s+/g, ' ').slice(0, 60);
       if (!name) throw new AuthError('Scrivi il tuo nome.');
-      list[i] = { ...list[i], name };
-      this.set(BOOK_KEY, JSON.stringify(list));
+      const list = this.accounts();
+      const i = list.findIndex((a) => a.id === userId);
+      if (i < 0) throw new AuthError('Non trovo più il tuo account su questo dispositivo: esci e accedi di nuovo.');
+      if (list[i].name !== name) {
+        list[i] = { ...list[i], name };
+        this.set(BOOK_KEY, JSON.stringify(list));
+      }
     }
     if (patch.avatar !== undefined) {
       if (patch.avatar) this.set(this.avatarKey(userId), patch.avatar);

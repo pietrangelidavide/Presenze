@@ -136,9 +136,11 @@ export function DayEditor({ day }: { day: string }) {
         ) : null}
 
         <div className="card" style={{ background: 'var(--card2)', padding: 14 }} aria-live="polite">
-          {work && info.status === 'done' && info.auto ? (
+          {work && info.auto ? (
             <div className="stack" style={{ gap: 10 }}>
-              <p className="muted">Smart working senza orari: contiamo in automatico le ore previste. Se inserisci ingresso e uscita valgono quelli.</p>
+              <p className="muted">{day > today
+                ? 'Smart working senza orari: conta già come una giornata normale, con le ore previste. Entra nel saldo quando arriva il giorno.'
+                : 'Smart working senza orari: conta come una giornata normale, con le ore previste. Se inserisci ingresso e uscita valgono quelli.'}</p>
               <div className="kv" style={{ marginTop: 0 }}>
                 <div><div className="k">Ore contate</div><div className="v">{dur(info.worked)}</div></div>
                 <div><div className="k">Previste</div><div className="v">{dur(info.expected)}</div></div>

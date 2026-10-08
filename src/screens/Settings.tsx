@@ -166,7 +166,7 @@ export function Settings() {
         {confirm ? (
           <div className="warn bad" style={{ marginTop: 12 }} role="alert">
             <span>
-              {confirm === 'demo' ? 'I dati attuali verranno sostituiti da quelli di esempio. Prima fai una copia di sicurezza se ti servono.' : confirm === 'clear' ? 'Cancellare giornate, permessi e impostazioni? Non si può annullare.' : `Sostituire i dati attuali con quelli del file (${confirm.import.days.length} giornate, ${confirm.import.permits.length} permessi)?`}
+              {confirm === 'demo' ? 'I dati attuali verranno sostituiti da quelli di esempio. Prima fai una copia di sicurezza se ti servono.' : confirm === 'clear' ? 'Cancellare giornate, permessi, team e impostazioni? Non si può annullare.' : `Sostituire i dati attuali con quelli del file (${confirm.import.days.length} giornate, ${confirm.import.permits.length} permessi${confirm.import.team.length ? `, ${confirm.import.team.length} ${confirm.import.team.length === 1 ? 'persona' : 'persone'} nel team` : ''})?`}
             </span>
             <button type="button" className="btn sm danger" onClick={async () => {
               const c = confirm; setConfirm(null);

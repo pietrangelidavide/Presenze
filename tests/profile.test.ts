@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AccountBook } from '../src/lib/accounts';
+import { AccountBook, BOOK_KEY } from '../src/lib/accounts';
 import { AVATAR_MAX_CHARS, LocalProfile, fitCrop, initials, sanitizeAvatar, sanitizeName, zoomAround } from '../src/lib/profile';
 
 function memoryStorage() {
@@ -93,6 +93,54 @@ test('profilo locale: nome vuoto o account sconosciuto vengono rifiutati', async
   const book = new AccountBook(memoryStorage());
   const a = await book.signUp({ name: 'Anna', email: 'a@b.it', password: 'segreta1' });
   assert.throws(() => book.updateProfile(a.id, { name: '   ' }), /nome/i);
-  assert.throws(() => book.updateProfile('sconosciuto', { name: 'X' }), /non trovato/i);
+  assert.throws(() => book.updateProfile('sconosciuto', { name: 'X' }), /non trovo/i);
+  assert.throws(() => book.updateProfile('', { avatar: JPG }), /non trovato/i);
   assert.equal(book.session()?.name, 'Anna');
+});
+
+test('foto: si salva anche se il browser ha perso l’elenco degli account (errore "Account non trovato")', async () => {
+  const st = memoryStorage();
+  const book = new AccountBook(st);
+  const a = await book.signUp({ name: 'Anna', email: 'a@b.it', password: 'segreta1' });
+  const p = new LocalProfile(book, a.id);
+  st.raw.delete(BOOK_KEY);                                // il browser "dimentica" gli account mentre l'app è aperta
+  await p.save({ name: 'Anna', avatar: JPG }, { avatar: JPG });   // prima: Account non trovato su questo dispositivo
+  assert.equal((await p.load()).avatar, JPG);
+  assert.equal(st.getItem(`presenze.avatar.v1.${a.id}`), JPG);
+  // anche togliere la foto e cambiare nome funzionano: l'elenco resta in memoria finché la pagina è aperta
+  await p.save({ name: 'Anna', avatar: null }, { avatar: null });
+  assert.equal((await p.load()).avatar, null);
+  await p.save({ name: 'Anna Rossi', avatar: null }, { name: 'Anna Rossi' });
+  assert.equal((await p.load()).name, 'Anna Rossi');
+});
+
+test('foto: salvare solo la foto non cerca né modifica l’account', async () => {
+  const st = memoryStorage();
+  const book = new AccountBook(st);
+  const a = await book.signUp({ name: 'Anna', email: 'a@b.it', password: 'segreta1' });
+  const before = st.getItem(BOOK_KEY);
+  // un profilo "vecchio" con un nome diverso da quello salvato non deve far fallire né riscrivere nulla
+  await new LocalProfile(book, a.id).save({ name: 'Nome Vecchio', avatar: JPG }, { avatar: JPG });
+  assert.equal(st.getItem(BOOK_KEY), before);
+  assert.equal(book.avatar(a.id), JPG);
+});
+
+test('foto: browser che rifiuta le scritture (spazio pieno) o le ignora in silenzio', async () => {
+  // 1) setItem lancia un errore
+  const full = { ...memoryStorage(), setItem: () => { throw new Error('QuotaExceededError'); } };
+  const b1 = new AccountBook(full);
+  const u1 = await b1.signUp({ name: 'Anna', email: 'a@b.it', password: 'segreta1' });
+  assert.equal(b1.session()?.id, u1.id);                  // l'account esiste almeno finché la pagina è aperta
+  await new LocalProfile(b1, u1.id).save({ name: 'Anna', avatar: JPG }, { avatar: JPG });
+  assert.equal(b1.avatar(u1.id), JPG);
+  assert.equal(b1.volatile, true);
+  // 2) setItem non fa nulla e non dice nulla
+  const mute = { ...memoryStorage(), setItem: () => undefined };
+  const b2 = new AccountBook(mute);
+  const u2 = await b2.signUp({ name: 'Bruno', email: 'b@b.it', password: 'segreta1' });
+  assert.equal(b2.session()?.id, u2.id);
+  await new LocalProfile(b2, u2.id).save({ name: 'Bruno', avatar: JPG }, { avatar: JPG });
+  assert.equal(b2.avatar(u2.id), JPG);
+  b2.signOut();
+  assert.equal(b2.session(), null);                       // uscire funziona davvero
 });

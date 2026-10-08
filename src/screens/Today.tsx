@@ -267,7 +267,7 @@ function WeekCard() {
       <div className="meter" role="progressbar" aria-valuemin={0} aria-valuemax={w.planned} aria-valuenow={Math.round(w.worked)} aria-label="Ore della settimana"><i style={{ width: `${pctDone * 100}%` }} /></div>
       <div className={`week-cols ${showWeekend ? 'seven' : ''}`}>
         {cols.map((d) => {
-          const h = d.status === 'done' || d.status === 'open' ? d.worked : 0;
+          const h = d.status === 'done' || d.status === 'open' || d.auto ? d.worked : 0;
           return (
             <button type="button" key={d.day} className={`wcol ${d.day === today ? 'today' : ''}`} onClick={() => s.openDay(d.day)} aria-label={`${dayShort(d.day)}: ${STATUS_LABEL[d.status]}`}>
               <span className="wd">{WEEKDAY_SHORT[d.wd - 1]}</span>

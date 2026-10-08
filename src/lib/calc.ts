@@ -74,7 +74,7 @@ export interface DayInfo {
   gross: number;             // presenza (uscita − ingresso)
   breakMin: number;          // pausa usata nel calcolo
   worked: number;            // ore nette (per "open": stima fino a ora)
-  auto: boolean;             // smart working senza timbratura: valgono le ore previste
+  auto: boolean;             // smart working senza timbratura: valgono le ore previste (anche se il giorno è futuro)
   balance: number;           // worked − expected, solo per i giorni contati
   counted: boolean;          // entra nel saldo
   inMin: number | null;
@@ -128,10 +128,12 @@ export function dayInfo(day: string, ctx: Ctx, today: string, nowMin = 0): DayIn
       const br = elapsed >= 240 ? Math.min(elapsed, entry.breakMin ?? sched.breakMin) : 0;
       return { ...withTimes, status: 'open', gross: elapsed, breakMin: br, worked: Math.max(0, elapsed - br) };
     }
-    // Smart working senza timbratura: per la giornata valgono in automatico le ore previste (saldo zero).
-    // Vale da oggi in giù e dal primo giorno di conteggio; i giorni futuri restano solo pianificati.
-    if (entry.mode === 'smart' && inMin === null && outMin === null && day <= today && tracked && workExpected > 0) {
-      return { ...withTimes, status: 'done', auto: true, worked: workExpected, counted: true, balance: 0 };
+    // Smart working senza timbratura: la giornata vale come una giornata normale, cioè le ore previste (saldo zero).
+    // Da oggi in giù è già una giornata fatta. Nei giorni futuri le ore si vedono subito nella giornata e nella settimana,
+    // ma restano "pianificate": entrano nel saldo e nelle statistiche quando il giorno arriva.
+    if (entry.mode === 'smart' && inMin === null && outMin === null && tracked && workExpected > 0) {
+      if (day <= today) return { ...withTimes, status: 'done', auto: true, worked: workExpected, counted: true, balance: 0 };
+      return { ...withTimes, status: 'planned', auto: true, worked: workExpected };
     }
     if (day >= today) return { ...withTimes, status: 'planned' };
     return { ...withTimes, status: 'incomplete', counted: tracked, balance: tracked ? -workExpected : 0 };

@@ -2,8 +2,9 @@
 // Servono per vedere la dashboard piena e per provare l'app senza inserire nulla.
 import { defaultSettings } from './calc';
 import { holidayName } from './holidays';
+import { sortTeam } from './store';
 import { addDays, clock, mondayOf, toMin, weekday } from './time';
-import type { Data, DayEntry, Mode, Permit, Reason } from './types';
+import type { Data, DayEntry, Mode, Permit, Reason, TeamMember } from './types';
 
 /** Generatore pseudo-casuale con seme: stessi dati a ogni avvio. */
 function rng(seed: number) {
@@ -114,5 +115,16 @@ export function demoData(today: string): Data {
   // Un permesso e ferie già in programma
   permits.push({ id: `demo-p${permitIdx++}`, day: addDays(nextMon, 3), minutes: 90, start: '15:00', reason: 'medical', note: 'Dentista' });
 
-  return { settings, days: days.sort((a, b) => a.day.localeCompare(b.day)), permits: permits.sort((a, b) => a.day.localeCompare(b.day)) };
+  // Un piccolo team inventato, giusto per vedere come si presenta la pagina Team.
+  const member = (n: number, name: string, level: TeamMember['level'], role: string, note: string | null = null): TeamMember =>
+    ({ id: `00000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`, name, level, role, contact: null, note });
+  const team: TeamMember[] = [
+    member(1, 'Giulia Ferri', 'capo', 'Responsabile del progetto'),
+    member(2, 'Marco Bellini', 'senior', 'Analista', 'Referente per le verifiche'),
+    member(3, 'Sara Conti', 'senior', 'Sviluppatrice'),
+    member(4, 'Luca Romano', 'junior', 'Analista'),
+    member(5, 'Elena Greco', 'junior', 'Sviluppatrice', 'Inserita a settembre'),
+  ];
+
+  return { settings, days: days.sort((a, b) => a.day.localeCompare(b.day)), permits: permits.sort((a, b) => a.day.localeCompare(b.day)), team: sortTeam(team) };
 }

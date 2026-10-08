@@ -7,6 +7,7 @@ import { PermitEditor } from './screens/PermitEditor';
 import { Permits } from './screens/Permits';
 import { Profile } from './screens/Profile';
 import { Settings } from './screens/Settings';
+import { Team } from './screens/Team';
 import { Today } from './screens/Today';
 import { hasSupabase } from './lib/supabase';
 import { onLinkClick, useRoute } from './route';
@@ -15,11 +16,12 @@ import { useThemePref, type ThemePref } from './theme';
 import { Avatar, Icon } from './ui';
 
 const ROUTES = [
-  { id: 'oggi', label: 'Oggi', icon: 'today' },
-  { id: 'calendario', label: 'Calendario', icon: 'calendar' },
-  { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
-  { id: 'permessi', label: 'Permessi', icon: 'permit' },
-  { id: 'impostazioni', label: 'Impostazioni', icon: 'settings' },
+  { id: 'oggi', label: 'Oggi', short: 'Oggi', icon: 'today' },
+  { id: 'calendario', label: 'Calendario', short: 'Calendario', icon: 'calendar' },
+  { id: 'dashboard', label: 'Dashboard', short: 'Dashboard', icon: 'chart' },
+  { id: 'permessi', label: 'Permessi', short: 'Permessi', icon: 'permit' },
+  { id: 'team', label: 'Team', short: 'Team', icon: 'team' },
+  { id: 'impostazioni', label: 'Impostazioni', short: 'Impost.', icon: 'settings' },
 ] as const;
 
 const NEXT_THEME: Record<ThemePref, ThemePref> = { auto: 'light', light: 'dark', dark: 'auto' };
@@ -49,6 +51,7 @@ function Shell() {
     case 'calendario': screen = <Calendar />; break;
     case 'dashboard': screen = <Dashboard />; break;
     case 'permessi': screen = <Permits />; break;
+    case 'team': screen = <Team />; break;
     case 'impostazioni': screen = <Settings />; break;
     case 'profilo': screen = <Profile />; break;
     default: screen = <Today />;
@@ -83,7 +86,7 @@ function Shell() {
       <nav className="tabbar" aria-label="Navigazione principale">
         {ROUTES.map((r) => (
           <a key={r.id} href={`#/${r.id}`} onClick={onLinkClick(r.id)} className="tab" aria-current={route === r.id ? 'page' : undefined}>
-            <span className="tab-ico"><Icon name={r.icon} /></span>{r.label}
+            <span className="tab-ico"><Icon name={r.icon} /></span>{r.short}
           </a>
         ))}
       </nav>

@@ -2,7 +2,7 @@
 // anche quando il browser o la finestra che ospita l'app non permette di cambiarlo.
 import { useSyncExternalStore } from 'react';
 
-export const ROUTE_IDS = ['oggi', 'calendario', 'dashboard', 'permessi', 'impostazioni', 'profilo'] as const;
+export const ROUTE_IDS = ['oggi', 'calendario', 'dashboard', 'permessi', 'team', 'impostazioni', 'profilo'] as const;
 export type RouteId = (typeof ROUTE_IDS)[number];
 
 function fromHash(): RouteId {

@@ -62,6 +62,20 @@ create table if not exists public.presenze_profiles (
   updated_at   timestamptz not null default now()
 );
 
+-- ── Team: le persone del tuo gruppo di lavoro ───────────────────────────────
+-- Sono appunti tuoi (nome, livello, mansione): le persone indicate non hanno un account e non vedono nulla.
+create table if not exists public.presenze_team (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  name       text not null check (char_length(name) between 1 and 60),
+  level      text not null default 'junior' check (level in ('capo', 'senior', 'junior')),
+  role       text check (role is null or char_length(role) <= 60),
+  contact    text check (contact is null or char_length(contact) <= 80),
+  note       text check (note is null or char_length(note) <= 300),
+  created_at timestamptz not null default now()
+);
+create index if not exists presenze_team_user on public.presenze_team (user_id);
+
 -- ── Data dell'ultima modifica ───────────────────────────────────────────────
 create or replace function public.presenze_touch() returns trigger
 language plpgsql as $$
@@ -87,6 +101,7 @@ alter table public.presenze_settings enable row level security;
 alter table public.presenze_days     enable row level security;
 alter table public.presenze_permits  enable row level security;
 alter table public.presenze_profiles enable row level security;
+alter table public.presenze_team     enable row level security;
 
 drop policy if exists presenze_settings_own on public.presenze_settings;
 create policy presenze_settings_own on public.presenze_settings
@@ -100,10 +115,14 @@ drop policy if exists presenze_profiles_own on public.presenze_profiles;
 create policy presenze_profiles_own on public.presenze_profiles
   for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+drop policy if exists presenze_team_own on public.presenze_team;
+create policy presenze_team_own on public.presenze_team
+  for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
 drop policy if exists presenze_permits_own on public.presenze_permits;
 create policy presenze_permits_own on public.presenze_permits
   for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- Permessi di accesso alle API: solo chi ha fatto l'accesso, mai in modo anonimo
-revoke all on public.presenze_settings, public.presenze_days, public.presenze_permits, public.presenze_profiles from anon;
-grant select, insert, update, delete on public.presenze_settings, public.presenze_days, public.presenze_permits, public.presenze_profiles to authenticated;
+revoke all on public.presenze_settings, public.presenze_days, public.presenze_permits, public.presenze_profiles, public.presenze_team from anon;
+grant select, insert, update, delete on public.presenze_settings, public.presenze_days, public.presenze_permits, public.presenze_profiles, public.presenze_team to authenticated;

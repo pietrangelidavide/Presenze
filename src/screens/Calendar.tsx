@@ -12,7 +12,8 @@ function cellLabel(d: DayInfo): string {
   const parts = [`${Number(d.day.slice(8))} ${monthTitle(d.day).split(' ')[0].toLowerCase()}`];
   if (d.holiday) parts.push(d.holiday);
   parts.push(d.mode ? MODE_LABEL[d.mode] : STATUS_LABEL[d.status]);
-  if (d.status === 'done' || d.status === 'open') parts.push(dur(d.worked));
+  if (d.status === 'done' || d.status === 'open' || d.auto) parts.push(dur(d.worked));
+  if (d.auto && d.status === 'planned') parts.push('ore previste, in automatico');
   if (d.permitMin) parts.push(`permesso ${dur(d.permitMin)}`);
   if (d.status === 'missing' || d.status === 'incomplete') parts.push('da sistemare');
   return parts.join(', ');
@@ -59,7 +60,7 @@ export function Calendar() {
           <div className="cal-dow tot-h" role="columnheader" style={{ visibility: 'hidden' }}>Tot</div>
           {weeks.map((wk) => {
             const infos = wk.map(tl.get);
-            const worked = infos.reduce((t, d) => t + (d.counted ? d.worked : 0), 0);
+            const worked = infos.reduce((t, d) => t + (d.counted || d.auto ? d.worked : 0), 0);
             const plan = infos.reduce((t, d) => t + (['holiday', 'vacation', 'sick', 'rest', 'before'].includes(d.status) ? 0 : d.expected), 0);
             return (
               <div key={wk[0]} style={{ display: 'contents' }} role="row">
@@ -67,7 +68,7 @@ export function Calendar() {
                   const out = d.day < period.from || d.day > period.to;
                   const bad = d.status === 'missing' || d.status === 'incomplete';
                   const stripe = d.mode ? MODE_COLOR[d.mode] : d.holiday ? 'var(--v-festivo)' : null;
-                  const hrs = d.status === 'done' || d.status === 'open' ? dur(d.worked) : '';
+                  const hrs = d.status === 'done' || d.status === 'open' || d.auto ? dur(d.worked) : '';
                   const label = d.mode ? SHORT[d.mode] : d.holiday ?? (bad ? STATUS_LABEL[d.status] : '');
                   return (
                     <button

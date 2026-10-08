@@ -3,11 +3,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { makeCtx, type Ctx } from './lib/calc';
 import { accountBook } from './lib/accounts';
 import { CloudProfile, EMPTY_PROFILE, LocalProfile, sanitizeAvatar, sanitizeName, type Profile, type ProfileApi } from './lib/profile';
-import { CloudRepo, LocalRepo, sanitizeData, type Repo } from './lib/store';
+import { CloudRepo, LocalRepo, newId, sanitizeData, sortTeam, type Repo } from './lib/store';
 import { buildTimeline, type Timeline } from './lib/stats';
 import { supabase } from './lib/supabase';
 import { ymd } from './lib/time';
-import type { Data, DayEntry, Permit, Settings } from './lib/types';
+import type { Data, DayEntry, Permit, Settings, TeamMember } from './lib/types';
 
 export type Boot = 'loading' | 'auth' | 'ready' | 'error';
 export interface ToastMsg { id: number; text: string; bad: boolean }
@@ -34,6 +34,9 @@ export interface Store {
   addPermit: (p: Omit<Permit, 'id'>) => Promise<boolean>;
   updatePermit: (p: Permit) => Promise<boolean>;
   deletePermit: (id: string) => Promise<boolean>;
+  /** Aggiunge (senza `id`) o aggiorna una persona del team. */
+  saveMember: (m: Omit<TeamMember, 'id'> & { id?: string }) => Promise<boolean>;
+  deleteMember: (id: string) => Promise<boolean>;
   saveSettings: (s: Settings) => Promise<boolean>;
   replaceAll: (d: Data) => Promise<boolean>;
   clearAll: () => Promise<boolean>;
@@ -194,6 +197,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updatePermit = useCallback((p: Permit) => commit((d) => ({ ...d, permits: d.permits.map((x) => (x.id === p.id ? p : x)) }), (r) => r.updatePermit(p)), [commit]);
   const deletePermit = useCallback((id: string) => commit((d) => ({ ...d, permits: d.permits.filter((x) => x.id !== id) }), (r) => r.deletePermit(id)), [commit]);
   const saveSettings = useCallback((s: Settings) => commit((d) => ({ ...d, settings: s }), (r) => r.saveSettings(s)), [commit]);
+  const saveMember = useCallback((m: Omit<TeamMember, 'id'> & { id?: string }) => {
+    const full: TeamMember = { ...m, id: m.id ?? newId() };
+    return commit((d) => ({ ...d, team: sortTeam([...d.team.filter((x) => x.id !== full.id), full]) }), (r) => r.saveMember(full));
+  }, [commit]);
+  const deleteMember = useCallback((id: string) => commit((d) => ({ ...d, team: d.team.filter((x) => x.id !== id) }), (r) => r.deleteMember(id)), [commit]);
   const replaceAll = useCallback((next: Data) => commit(() => next, (r) => r.replaceAll(next)), [commit]);
   const clearAll = useCallback(() => commit(() => sanitizeData(null, todayNow()), (r) => r.clearAll()), [commit]);
 
@@ -222,7 +230,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (patch.avatar && !next.avatar) { toast('Questa foto non è valida o è troppo grande.', true); return false; }
     if (patch.name !== undefined && !next.name) { toast('Scrivi il tuo nome.', true); return false; }
     try {
-      await api.save(next);
+      await api.save(next, patch);
       profileData.current = next;
       setName(next.name);
       setAvatar(next.avatar);
@@ -240,7 +248,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     boot, error, kind: supabase ? 'cloud' : 'local', email, name, avatar, data, ctx, tl, now, today, nowMin, toasts, toast,
-    saveDay, deleteDay, addPermit, updatePermit, deletePermit, saveSettings, replaceAll, clearAll, saveProfile, signOut, reload,
+    saveDay, deleteDay, addPermit, updatePermit, deletePermit, saveMember, deleteMember, saveSettings, replaceAll, clearAll, saveProfile, signOut, reload,
     dayEditor, openDay, permitEditor, openPermit,
   };
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

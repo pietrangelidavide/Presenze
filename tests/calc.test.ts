@@ -163,11 +163,18 @@ test('giorno passato con un orario solo: incompleto, conta come ore mancanti', (
   assert.equal(dayInfo('2026-10-06', c, TODAY).status, 'incomplete');
 });
 
-test('giorno futuro segnato (smart pianificato) è solo pianificato', () => {
-  const c = ctxOf([entry('2026-10-09', { mode: 'smart' })]);
+test('giorno futuro segnato: in sede resta solo pianificato, smart vale già le ore previste ma non entra nel saldo', () => {
+  const c = ctxOf([entry('2026-10-09', { mode: 'smart' }), entry('2026-10-08')]);
   const d = dayInfo('2026-10-09', c, TODAY);
   assert.equal(d.status, 'planned');
   assert.equal(d.counted, false);
+  assert.equal(d.auto, true);
+  assert.equal(d.worked, 360);      // venerdì: 6 ore, come una giornata normale
+  assert.equal(d.balance, 0);
+  const office = dayInfo('2026-10-08', c, TODAY);
+  assert.equal(office.status, 'planned');
+  assert.equal(office.auto, false);
+  assert.equal(office.worked, 0);
 });
 
 test('giornate prima dell’inizio del conteggio non entrano nel saldo', () => {
@@ -199,11 +206,29 @@ test('smart working senza timbratura: valgono le ore previste del giorno', () =>
   assert.equal(today.status, 'done');
   assert.equal(today.auto, true);
   assert.equal(today.worked, 450);
+  // venerdì prossimo: conta già come una giornata normale (6 ore) nella giornata e nella settimana, ma non nel saldo
   const next = dayInfo('2026-10-09', c, TODAY);
   assert.equal(next.status, 'planned');
-  assert.equal(next.auto, false);
-  assert.equal(next.worked, 0);
+  assert.equal(next.auto, true);
+  assert.equal(next.worked, 360);
+  assert.equal(next.expected, 360);
   assert.equal(next.counted, false);
+  assert.equal(next.balance, 0);
+});
+
+test('smart pianificato nei giorni futuri: entra nelle ore della settimana, non nella banca ore', () => {
+  // oggi mercoledì 7 ottobre: lun e mar fatti, giovedì smart pianificato
+  const c = ctxOf([
+    entry('2026-10-05', { clockIn: '08:30', clockOut: '16:30' }),
+    entry('2026-10-06', { clockIn: '08:30', clockOut: '16:30' }),
+    entry('2026-10-08', { mode: 'smart' }),
+  ]);
+  const w = weekSummary(c, TODAY, TODAY, 8 * 60);
+  assert.equal(w.worked, 2 * 450 + 450);
+  assert.equal(w.smart, 1);
+  assert.equal(w.days.reduce((t, d) => t + d.balance, 0), 0);               // lun e mar in pari, giovedì non pesa
+  assert.equal(dayInfo('2026-10-08', c, TODAY).counted, false);              // nel saldo entrerà quando il giorno arriva
+  assert.equal(w.remaining, w.planned - w.worked);
 });
 
 test('smart working automatico: i permessi riducono le ore, le timbrature vere hanno la precedenza', () => {

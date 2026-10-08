@@ -2,7 +2,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { defaultSettings } from './calc';
 import { isHm, isYmd, normHm } from './time';
-import type { Data, DayEntry, DaySchedule, Mode, Permit, Reason, Settings } from './types';
+import { LEVEL_ORDER, TEAM_MAX, type Data, type DayEntry, type DaySchedule, type Mode, type Permit, type Reason, type Settings, type TeamLevel, type TeamMember } from './types';
 
 export interface Repo {
   kind: 'local' | 'cloud';
@@ -13,6 +13,9 @@ export interface Repo {
   addPermit(p: Omit<Permit, 'id'>): Promise<Permit>;
   updatePermit(p: Permit): Promise<void>;
   deletePermit(id: string): Promise<void>;
+  /** Aggiunge o aggiorna una persona del team. */
+  saveMember(m: TeamMember): Promise<void>;
+  deleteMember(id: string): Promise<void>;
   /** Sostituisce tutti i dati (importazione, dati di esempio). */
   replaceAll(d: Data): Promise<void>;
   clearAll(): Promise<void>;
@@ -22,6 +25,13 @@ export interface Repo {
 
 const MODES: Mode[] = ['office', 'smart', 'vacation', 'sick', 'holiday'];
 const REASONS: Reason[] = ['personal', 'medical', 'family', 'study', 'other'];
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Prima per livello (capo, senior, junior), poi in ordine alfabetico. */
+export function sortTeam(list: TeamMember[]): TeamMember[] {
+  return [...list].sort((a, b) => LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level) || a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }) || a.id.localeCompare(b.id));
+}
 
 /** Identificativo nel formato UUID (il database di Supabase lo richiede). */
 export const newId = (): string => {
@@ -89,7 +99,22 @@ export function sanitizeData(raw: unknown, today: string): Data {
   }
   permits.sort((a, b) => a.day.localeCompare(b.day) || (a.start ?? '').localeCompare(b.start ?? ''));
 
-  return { settings, days: [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day)), permits };
+  const team: TeamMember[] = [];
+  const seenMember = new Set<string>();
+  for (const x of Array.isArray(r.team) ? r.team : []) {
+    const o = x as Record<string, unknown>;
+    const name = text(o?.name, 60)?.replace(/\s+/g, ' ') ?? null;
+    if (!name || team.length >= TEAM_MAX) continue;
+    let id = typeof o.id === 'string' && UUID_RE.test(o.id) ? o.id : newId();   // il database vuole un UUID
+    if (seenMember.has(id)) id = newId();
+    seenMember.add(id);
+    team.push({
+      id, name, level: LEVEL_ORDER.includes(o.level as TeamLevel) ? (o.level as TeamLevel) : 'junior',
+      role: text(o.role, 60), contact: text(o.contact, 80), note: text(o.note, 300),
+    });
+  }
+
+  return { settings, days: [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day)), permits, team: sortTeam(team) };
 }
 
 // ── copia di sicurezza ──
@@ -154,6 +179,8 @@ export class LocalRepo implements Repo {
   }
   async updatePermit(p: Permit) { const d = this.read(); d.permits = d.permits.map((x) => (x.id === p.id ? p : x)); this.write(); }
   async deletePermit(id: string) { const d = this.read(); d.permits = d.permits.filter((x) => x.id !== id); this.write(); }
+  async saveMember(m: TeamMember) { const d = this.read(); d.team = sortTeam([...d.team.filter((x) => x.id !== m.id), m]); this.write(); }
+  async deleteMember(id: string) { const d = this.read(); d.team = d.team.filter((x) => x.id !== id); this.write(); }
   async replaceAll(next: Data) { this.data = structuredCloneSafe(next); this.write(); }
   async clearAll() { this.data = sanitizeData(null, this.today()); try { this.storage?.removeItem(this.key); } catch { /* niente da fare */ } }
 }
@@ -167,6 +194,10 @@ interface SettingsRow {
 }
 interface DayRow { day: string; mode: string; clock_in: string | null; clock_out: string | null; break_min: number | null; note: string | null }
 interface PermitRow { id: string; day: string; minutes: number; start_time: string | null; reason: string; note: string | null }
+interface MemberRow { id: string; name: string; level: string; role: string | null; contact: string | null; note: string | null }
+
+const TEAM_TABLE_MISSING = 'Manca la tabella del team: esegui di nuovo il file supabase/setup.sql.';
+const isMissingTable = (msg: string) => /presenze_team|relation|schema cache|does not exist/i.test(msg);
 
 const PAGE = 1000;
 
@@ -192,6 +223,9 @@ export class CloudRepo implements Repo {
     const s = srow as SettingsRow | null;
     const days = await this.all<DayRow>('presenze_days', 'day,mode,clock_in,clock_out,break_min,note', 'day');
     const permits = await this.all<PermitRow>('presenze_permits', 'id,day,minutes,start_time,reason,note', 'day');
+    // Il team è una parte nuova: se la tabella non c'è ancora l'app parte lo stesso, con il team vuoto.
+    let team: MemberRow[] = [];
+    try { team = await this.all<MemberRow>('presenze_team', 'id,name,level,role,contact,note', 'name'); } catch { team = []; }
     return sanitizeData({
       settings: s ? {
         schedule: s.schedule, smartPerWeek: s.smart_per_week, trackingStart: s.tracking_start, initialBalanceMin: s.initial_balance_min,
@@ -199,6 +233,7 @@ export class CloudRepo implements Repo {
       } : undefined,
       days: days.map((r) => ({ day: r.day, mode: r.mode, clockIn: r.clock_in, clockOut: r.clock_out, breakMin: r.break_min, note: r.note })),
       permits: permits.map((r) => ({ id: r.id, day: r.day, minutes: r.minutes, start: r.start_time, reason: r.reason, note: r.note })),
+      team: team.map((r) => ({ id: r.id, name: r.name, level: r.level, role: r.role, contact: r.contact, note: r.note })),
     }, this.today());
   }
 
@@ -214,7 +249,13 @@ export class CloudRepo implements Repo {
   private permitRow(p: Permit) {
     return { id: p.id, user_id: this.userId, day: p.day, minutes: p.minutes, start_time: p.start, reason: p.reason, note: p.note };
   }
+  private memberRow(m: TeamMember) {
+    return { id: m.id, user_id: this.userId, name: m.name, level: m.level, role: m.role, contact: m.contact, note: m.note };
+  }
   private check(error: { message: string } | null) { if (error) throw new Error(error.message); }
+  private checkTeam(error: { message: string } | null) {
+    if (error) throw new Error(isMissingTable(error.message) ? TEAM_TABLE_MISSING : error.message);
+  }
 
   async saveSettings(s: Settings) { this.check((await this.db.from('presenze_settings').upsert(this.settingsRow(s), { onConflict: 'user_id' })).error); }
   async saveDay(e: DayEntry) { this.check((await this.db.from('presenze_days').upsert(this.dayRow(e), { onConflict: 'user_id,day' })).error); }
@@ -226,14 +267,20 @@ export class CloudRepo implements Repo {
   }
   async updatePermit(p: Permit) { this.check((await this.db.from('presenze_permits').update(this.permitRow(p)).eq('id', p.id)).error); }
   async deletePermit(id: string) { this.check((await this.db.from('presenze_permits').delete().eq('id', id)).error); }
+  async saveMember(m: TeamMember) { this.checkTeam((await this.db.from('presenze_team').upsert(this.memberRow(m), { onConflict: 'id' })).error); }
+  async deleteMember(id: string) { this.checkTeam((await this.db.from('presenze_team').delete().eq('id', id)).error); }
 
   async clearAll() {
     for (const t of ['presenze_days', 'presenze_permits', 'presenze_settings']) this.check((await this.db.from(t).delete().eq('user_id', this.userId)).error);
+    // Se la tabella del team non c'è ancora non c'è nulla da cancellare.
+    const { error } = await this.db.from('presenze_team').delete().eq('user_id', this.userId);
+    if (error && !isMissingTable(error.message)) throw new Error(error.message);
   }
   async replaceAll(d: Data) {
     await this.clearAll();
     await this.saveSettings(d.settings);
     for (let i = 0; i < d.days.length; i += 500) this.check((await this.db.from('presenze_days').insert(d.days.slice(i, i + 500).map((e) => this.dayRow(e)))).error);
     for (let i = 0; i < d.permits.length; i += 500) this.check((await this.db.from('presenze_permits').insert(d.permits.slice(i, i + 500).map((p) => this.permitRow(p)))).error);
+    if (d.team.length) this.checkTeam((await this.db.from('presenze_team').insert(d.team.map((m) => this.memberRow(m)))).error);
   }
 }
