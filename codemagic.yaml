@@ -1,0 +1,38 @@
+# Build cloud di Presenze per iOS: crea l'app, la firma e la carica su TestFlight.
+# Si avvia a mano dalla dashboard di Codemagic (nessun avvio automatico a ogni modifica).
+workflows:
+  presenze-ios-beta:
+    name: Presenze iOS (TestFlight)
+    instance_type: mac_mini_m2
+    max_build_duration: 40
+    integrations:
+      app_store_connect: Presenze        # nome della chiave API data in Codemagic (passo 4 della guida)
+    environment:
+      node: 22
+      xcode: latest                      # serve Xcode 26 o successivo
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: it.pietrangeli.presenze
+    scripts:
+      - name: Installa i pacchetti
+        script: npm install
+      - name: Prova le funzioni
+        script: npm test
+      - name: Prepara il progetto iOS
+        script: bash scripts/ios-prepare.sh "$PROJECT_BUILD_NUMBER"
+      - name: Applica la firma
+        script: xcode-project use-profiles --project ios/App/App.xcodeproj
+      - name: Crea il file IPA
+        script: |
+          if [ -d ios/App/App.xcworkspace ]; then
+            xcode-project build-ipa --workspace ios/App/App.xcworkspace --scheme App
+          else
+            xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App
+          fi
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false

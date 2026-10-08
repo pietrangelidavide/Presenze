@@ -115,3 +115,16 @@ tests/                   test delle regole di calcolo
 ## Nota sulla privacy
 
 I dati sono tuoi: in modalità locale non lasciano il browser; con Supabase sono nel tuo progetto e protetti da Row Level Security. La chiave `anon` nel `.env` è pubblica per sua natura (finisce nell'app): la protezione sta nelle regole del database, non nella chiave.
+
+## Beta per iPhone (TestFlight)
+
+L'app web viene impacchettata in un'app iOS con [Capacitor](https://capacitorjs.com) e costruita nel cloud con Codemagic, senza bisogno di un Mac.
+
+```
+capacitor.config.ts   id dell'app (it.pietrangeli.presenze) e cartella web
+assets/               icona 1024 senza trasparenza e schermata di avvio
+scripts/ios-prepare.sh  crea il progetto iOS, copia l'app web e imposta Info.plist
+codemagic.yaml        build cloud: firma, crea l'IPA e lo carica su TestFlight
+```
+
+Dopo aver creato app e chiave API (passi 1–4 della guida), la build parte da Codemagic con *Start new build*. Il numero di build cresce da solo a ogni avvio; la versione è quella di `package.json`.
