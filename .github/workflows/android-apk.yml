@@ -1,0 +1,67 @@
+# Costruisce l'APK di Presenze per Android e lo pubblica nella release "beta".
+# Si avvia a mano: scheda Actions > "Android APK" > Run workflow.
+name: Android APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    name: Costruisci l'APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Installa i pacchetti
+        run: npm install
+
+      - name: Prova le funzioni
+        run: npm test
+
+      - name: Prepara il progetto Android
+        run: bash scripts/android-prepare.sh "${{ github.run_number }}"
+
+      - name: Costruisci
+        working-directory: android
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Firma l'APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/android-sign.sh
+
+      - name: Conserva il file
+        uses: actions/upload-artifact@v4
+        with:
+          name: Presenze-apk
+          path: build-out/Presenze.apk
+          retention-days: 30
+
+      - name: Pubblica la release "beta"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete beta --cleanup-tag --yes 2>/dev/null || true
+          gh release create beta build-out/Presenze.apk \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "Presenze beta (build ${{ github.run_number }})" \
+            --notes "Scarica Presenze.apk dal telefono Android e aprilo per installare l'app (serve Android 7 o successivo)."

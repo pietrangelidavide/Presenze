@@ -4,6 +4,9 @@
    - scuro forzato: data-theme="dark"
    I valori dei grafici (--v-*, --h*) sono validati con validate_palette.js sulle superfici chiara (#FFFFFF) e scura (#1E2350). */
 :root {
+  /* aree sicure (notch, barre di sistema): env() su iPhone e browser, variabili del contenitore su Android */
+  --sai-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --sai-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
   color-scheme: light;
   --bg: #F1F3F8; --card: #FFFFFF; --card2: #EEF1F8; --line: #D3D9E8; --text: #171C3F; --muted: #596081;
   --accent: #0060AE; --accent2: #004C8C; --accent-soft: rgba(0, 96, 174, 0.10); --accent-text: #0060AE;

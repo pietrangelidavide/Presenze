@@ -10,6 +10,13 @@ const config: CapacitorConfig = {
     contentInset: 'never', // la pagina gestisce da sola le aree sicure (notch e barra in basso)
     backgroundColor: '#13162E',
   },
+  android: {
+    backgroundColor: '#13162E',
+  },
+  plugins: {
+    // Su Android passa alla pagina lo spazio occupato dalle barre di sistema (variabili --safe-area-inset-*)
+    SystemBars: { insetsHandling: 'css' },
+  },
 };
 
 export default config;

@@ -128,3 +128,13 @@ codemagic.yaml        build cloud: firma, crea l'IPA e lo carica su TestFlight
 ```
 
 Dopo aver creato app e chiave API (passi 1–4 della guida), la build parte da Codemagic con *Start new build*. Il numero di build cresce da solo a ogni avvio; la versione è quella di `package.json`.
+
+## App Android (APK, gratis)
+
+Il workflow `.github/workflows/android-apk.yml` costruisce l'app Android con Capacitor su GitHub Actions e la pubblica come file `Presenze.apk` nella release **beta** del repository.
+
+1. Su GitHub apri **Actions** > **Android APK** > **Run workflow**.
+2. A build finita (circa 10 minuti) apri **Releases** > **Presenze beta** e scarica `Presenze.apk` dal telefono.
+3. Aprilo e consenti l'installazione da questa fonte quando Android lo chiede (serve Android 7 o successivo).
+
+La chiave di firma viene creata alla prima build e conservata nella release privata **chiave-firma**: non cancellarla, altrimenti per aggiornare l'app dovrai prima disinstallarla (esporta il backup dalle Impostazioni). I dati restano sul telefono, nel browser interno dell'app.
