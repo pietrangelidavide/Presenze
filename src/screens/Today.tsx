@@ -27,6 +27,12 @@ export function Today() {
     const e: DayEntry = { day: today, mode: m, clockIn: nowHm(new Date()), clockOut: null, breakMin: base?.breakMin ?? null, note: base?.note ?? null };
     if (await s.saveDay(e)) s.toast(`Ingresso registrato alle ${e.clockIn}`);
   };
+  /** Smart working: un solo tocco, senza orari. La giornata vale le ore previste di oggi. */
+  const registerSmart = async () => {
+    const base = ctx.entries.get(today);
+    const e: DayEntry = { day: today, mode: 'smart', clockIn: null, clockOut: null, breakMin: null, note: base?.note ?? null };
+    if (await s.saveDay(e)) s.toast(`Smart working registrato: ${dur(info.expected)} di oggi`);
+  };
   const endDay = async () => {
     const e = ctx.entries.get(today);
     if (!e || !e.clockIn) return;
@@ -48,7 +54,7 @@ export function Today() {
         <section className="card" aria-label="Primi passi">
           <div className="card-head"><div><h2>Benvenuto</h2><p className="card-sub">Tutto parte da qui.</p></div></div>
           <div className="stack" style={{ gap: 8 }}>
-            <p>Quando arrivi al lavoro premi <b>Entra ora</b>, quando esci premi <b>Esci ora</b>. La pausa pranzo di 30′ viene tolta da sola.</p>
+            <p>Quando arrivi al lavoro premi <b>Entra ora</b>, quando esci premi <b>Esci ora</b>. La pausa pranzo di 30′ viene tolta da sola. In smart working basta un tocco su <b>Registra smart working</b>: la giornata vale le ore previste.</p>
             <p className="muted">L’orario è già impostato su 36 ore: lunedì–giovedì 8 ore di presenza (7h30 nette), venerdì 6 ore. Puoi cambiarlo in Impostazioni.</p>
             {s.kind === 'local' ? (
               <div className="row wrap" style={{ marginTop: 6 }}>
@@ -59,7 +65,7 @@ export function Today() {
         </section>
       ) : null}
 
-      <Hero info={info} mode={mode} setMode={setMode} overLimit={overLimit} smartUsed={smartUsed} limit={limit} onStart={startDay} onEnd={endDay} />
+      <Hero info={info} mode={mode} setMode={setMode} overLimit={overLimit} smartUsed={smartUsed} limit={limit} onStart={startDay} onSmart={registerSmart} onEnd={endDay} />
 
       {fix.length ? (
         <section className="card" aria-label="Giorni da sistemare">
@@ -96,8 +102,8 @@ export function Today() {
 }
 
 // ───────────────────────── scheda principale ─────────────────────────
-function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onEnd }: {
-  info: DayInfo; mode: Mode; setMode: (m: Mode) => void; overLimit: boolean; smartUsed: number; limit: number; onStart: () => void; onEnd: () => void;
+function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onSmart, onEnd }: {
+  info: DayInfo; mode: Mode; setMode: (m: Mode) => void; overLimit: boolean; smartUsed: number; limit: number; onStart: () => void; onSmart: () => void; onEnd: () => void;
 }) {
   const s = useStore();
   const { ctx, nowMin, today } = s;
@@ -163,7 +169,6 @@ function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onEnd
           {info.permitMin ? <span>Permessi di oggi <b className="num">{dur(info.permitMin)}</b></span> : null}
         </div>
         <div className="hero-actions">
-          <button type="button" className="btn primary lg" onClick={onStart}><Icon name="play" size={18} /> Timbra comunque</button>
           <button type="button" className="btn" onClick={() => s.openDay(today)}><Icon name="edit" size={18} /> Modifica</button>
         </div>
       </section>
@@ -200,6 +205,8 @@ function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onEnd
   const m = planned ?? mode;
   const reason = info.holiday ? `Oggi è festa: ${info.holiday}.` : !hasWork ? 'Oggi non è previsto lavoro.' : null;
   const ifNow = hasWork ? nowMin + info.expected + (sched?.breakMin ?? 0) : null;
+  // Smart working in una giornata con ore previste: basta un tocco, vale l'orario completo.
+  const smartOneTap = m === 'smart' && info.expected > 0;
   return (
     <section className="card hero" aria-label="Inizia la giornata">
       <div className="hero-top">
@@ -213,7 +220,7 @@ function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onEnd
       </div>
       {hasWork ? (
         <div className="hero-meta">
-          {ifNow !== null && ifNow < 24 * 60 ? <span>Se entri adesso esci alle <b className="num">{clock(ifNow)}</b></span> : null}
+          {smartOneTap ? <span>In smart working contiamo le ore previste di oggi: <b className="num">{dur(info.expected)}</b></span> : ifNow !== null && ifNow < 24 * 60 ? <span>Se entri adesso esci alle <b className="num">{clock(ifNow)}</b></span> : null}
           {info.permitMin ? <span>Permessi di oggi <b className="num">{dur(info.permitMin)}</b></span> : null}
         </div>
       ) : null}
@@ -227,10 +234,16 @@ function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onEnd
       {m === 'smart' && smartUsed >= limit ? (
         <div className="warn" style={{ marginTop: 12 }}><Icon name="alert" size={18} /><span>Questa settimana hai già {smartUsed} {smartUsed === 1 ? 'giorno' : 'giorni'} di smart working su {limit}. Puoi segnarlo lo stesso.</span></div>
       ) : null}
-      <div className="hero-actions">
-        <button type="button" className="btn primary lg" onClick={onStart}><Icon name="play" size={18} /> {overLimit && !planned ? 'Entra comunque' : 'Entra ora'}</button>
-        <button type="button" className="btn" onClick={() => s.openDay(today)}>Inserisci a mano</button>
-      </div>
+      {smartOneTap ? (
+        <div className="hero-actions">
+          <button type="button" className="btn primary lg" onClick={onSmart}><Icon name="smart" size={18} /> {overLimit && !planned ? 'Registra comunque' : 'Registra smart working'}</button>
+        </div>
+      ) : (
+        <div className="hero-actions">
+          <button type="button" className="btn primary lg" onClick={onStart}><Icon name="play" size={18} /> {overLimit && !planned ? 'Entra comunque' : 'Entra ora'}</button>
+          <button type="button" className="btn" onClick={() => s.openDay(today)}>Inserisci a mano</button>
+        </div>
+      )}
     </section>
   );
 }
