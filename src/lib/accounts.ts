@@ -8,6 +8,8 @@ type Box = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 export const BOOK_KEY = 'presenze.accounts.v1';
 export const SESSION_KEY = 'presenze.session.v1';
 export const LEGACY_DATA_KEY = 'presenze.v1';
+/** Quale account è quale persona del team (vedi `members()`). */
+export const MEMBERS_KEY = 'presenze.members.v1';
 export const MIN_PASSWORD = 6;
 
 export interface LocalAccount {
@@ -20,6 +22,8 @@ export interface LocalAccount {
   createdAt: string;
 }
 export interface LocalUser { id: string; name: string; email: string }
+/** Una persona del team scelta da un account di questo dispositivo; `share` = i colleghi vedono i suoi orari. */
+export interface MemberSlot { userId: string; share: boolean }
 
 /** Errore con un messaggio già pronto da mostrare. */
 export class AuthError extends Error {}
@@ -133,10 +137,10 @@ export class AccountBook {
   }
   private emit(): void { for (const fn of [...this.listeners]) fn(); }
 
-  async signUp(input: { name: string; email: string; password: string }): Promise<LocalUser> {
-    const name = input.name.trim().replace(/\s+/g, ' ').slice(0, 60);
+  async signUp(input: { name?: string; email: string; password: string }): Promise<LocalUser> {
     const email = normEmail(input.email);
-    if (!name) throw new AuthError('Scrivi il tuo nome.');
+    // Il nome vero arriva dopo, quando si sceglie la persona del team; intanto basta la parte prima della @.
+    const name = (input.name ?? '').trim().replace(/\s+/g, ' ').slice(0, 60) || email.split('@')[0].slice(0, 60);
     if (!validEmail(email)) throw new AuthError('Controlla l’email: sembra incompleta.');
     if (input.password.length < MIN_PASSWORD) throw new AuthError(`La password deve avere almeno ${MIN_PASSWORD} caratteri.`);
     const list = this.accounts();
@@ -173,6 +177,25 @@ export class AccountBook {
     this.del(SESSION_KEY);
     this.emit();
   }
+
+  // ── team: quale account è quale persona ──
+  /** Le persone del team già scelte su questo dispositivo: { idPersona: { userId, share } }. */
+  members(): Record<string, MemberSlot> {
+    const out: Record<string, MemberSlot> = {};
+    try {
+      const raw: unknown = JSON.parse(this.get(MEMBERS_KEY) ?? '{}');
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+      for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {
+        const o = v as Partial<MemberSlot> | null;
+        if (o && typeof o.userId === 'string' && o.userId) out[id] = { userId: o.userId, share: o.share !== false };
+      }
+    } catch { /* elenco illeggibile: si riparte vuoti */ }
+    return out;
+  }
+  setMembers(m: Record<string, MemberSlot>): void { this.set(MEMBERS_KEY, JSON.stringify(m)); }
+
+  /** I dati salvati di un account (testo JSON), se ci sono: serve a mostrare agli altri gli orari condivisi. */
+  rawData(userId: string): string | null { return this.get(this.dataKey(userId)); }
 
   // ── profilo: nome e foto ──
   private avatarKey(userId: string): string { return `presenze.avatar.v1.${userId}`; }

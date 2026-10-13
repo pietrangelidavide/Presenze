@@ -13,14 +13,12 @@ type Msg = { text: string; bad: boolean };
 
 export function Auth() {
   const [mode, setMode] = useState<Mode>('in');
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [again, setAgain] = useState('');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Msg | null>(null);
-  const nameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const pwRef = useRef<HTMLInputElement>(null);
   const againRef = useRef<HTMLInputElement>(null);
@@ -30,10 +28,10 @@ export function Auth() {
   const local = !supabase;
   const up = mode === 'up';
 
-  const fail = (text: string, field?: 'name' | 'email' | 'pw' | 'again') => {
+  const fail = (text: string, field?: 'email' | 'pw' | 'again') => {
     setMsg({ text, bad: true });
     setBadField(field ?? null);
-    const el = field === 'name' ? nameRef.current : field === 'email' ? emailRef.current : field === 'pw' ? pwRef.current : field === 'again' ? againRef.current : null;
+    const el = field === 'email' ? emailRef.current : field === 'pw' ? pwRef.current : field === 'again' ? againRef.current : null;
     el?.focus();
   };
 
@@ -50,7 +48,6 @@ export function Auth() {
     if (busy) return;
     setMsg(null);
     setBadField(null);
-    if (up && !name.trim()) return fail('Scrivi il tuo nome.', 'name');
     if (!validEmail(email)) return fail(email.trim() ? 'Controlla l’email: sembra incompleta.' : 'Scrivi la tua email.', 'email');
     if (!password) return fail('Scrivi la password.', 'pw');
     if (up && password.length < MIN_PASSWORD) return fail(`Scegli una password di almeno ${MIN_PASSWORD} caratteri.`, 'pw');
@@ -59,10 +56,10 @@ export function Auth() {
     setBusy(true);
     try {
       if (local) {
-        if (up) await book.signUp({ name, email, password });
+        if (up) await book.signUp({ email, password });
         else await book.signIn(email, password);
       } else if (up) {
-        const { data, error } = await supabase!.auth.signUp({ email: email.trim(), password, options: { data: { name: name.trim() } } });
+        const { data, error } = await supabase!.auth.signUp({ email: email.trim(), password });
         if (error) throw error;
         if (!data.session) {
           setMsg({ text: 'Account creato. Ti abbiamo scritto un’email: apri il link per confermare, poi accedi.', bad: false });
@@ -110,16 +107,10 @@ export function Auth() {
 
           <div>
             <h1 id="auth-title">{up ? 'Crea il tuo account' : 'Bentornato'}</h1>
-            <p className="muted">{up ? 'Ti bastano nome, email e una password.' : 'Accedi per vedere le tue ore.'}</p>
+            <p className="muted">{up ? 'Ti bastano email e password. Poi scegli chi sei nel team.' : 'Accedi per vedere le tue ore.'}</p>
           </div>
 
           <form className="auth-form" onSubmit={(e) => void submit(e)} noValidate role="tabpanel" aria-labelledby={up ? 'tab-up' : 'tab-in'}>
-            {up ? (
-              <div className="field">
-                <label htmlFor="au-name">Nome</label>
-                <input ref={nameRef} id="au-name" type="text" autoComplete="name" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} aria-invalid={badField === 'name'} />
-              </div>
-            ) : null}
             <div className="field">
               <label htmlFor="au-email">Email</label>
               <input ref={emailRef} id="au-email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={badField === 'email'} />
@@ -152,7 +143,7 @@ export function Auth() {
             ? (book.volatile
               ? 'Questo browser non conserva i dati: se chiudi la pagina l’account sparisce.'
               : 'Anteprima: gli account e i dati restano in questo browser e non vengono inviati altrove. Non usare una password che usi per altri servizi.')
-            : 'Ogni persona vede solo i propri dati.'}
+            : 'Note, permessi e saldo ore restano tuoi. Ai colleghi arrivano solo gli orari, e puoi nasconderli quando vuoi.'}
         </p>
       </div>
     </main>

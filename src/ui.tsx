@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import type { Mode } from './lib/types';
 import { initials } from './lib/profile';
 import { MODE_LABEL } from './lib/types';
@@ -41,6 +41,7 @@ const PATHS: Record<string, string> = {
   note: 'M5 4h14v16H5zM8.5 9h7M8.5 13h7M8.5 17h4',
   camera: 'M4 8h3l1.5-2h7L17 8h3v11H4zM12 11a3.2 3.2 0 100 6.4 3.2 3.2 0 000-6.4z',
   user: 'M12 4a4 4 0 100 8 4 4 0 000-8zM4.5 20a7.5 7.5 0 0115 0',
+  lock: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 017 0v3',
   team: 'M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM2.5 20a6.5 6.5 0 0113 0M16 4.4a3.5 3.5 0 010 6.7M18 14.3a6.5 6.5 0 013.5 5.7',
 };
 
@@ -130,13 +131,17 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
   );
 }
 
-/** Il marchio di Presenze: lo stesso disegno dell'icona dell'app (public/icon.svg), così interfaccia e schermata Home restano d'accordo. */
+/** Il marchio di Presenze: lo stesso disegno dell'icona dell'app (public/icon.svg, generata da scripts/icons.mjs), così interfaccia e schermata Home restano d'accordo. */
 export function BrandMark({ size = 30, className = '' }: { size?: number; className?: string }) {
+  // Ogni copia ha il suo gradiente: con un id solo, una copia nascosta (display:none) lo rende invisibile alle altre.
+  const gid = `bm${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
     <svg className={`brand-mark ${className}`} width={size} height={size} viewBox="0 0 512 512" aria-hidden="true" focusable="false">
-      <rect width="512" height="512" rx="112" fill="#F1E54C" />
-      <circle cx="256" cy="256" r="150" fill="none" stroke="#27305C" strokeWidth="30" />
-      <path d="M256 166v94l64 40" fill="none" stroke="#27305C" strokeWidth="30" strokeLinecap="round" strokeLinejoin="round" />
+      <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#4DA8FF" /><stop offset="1" stopColor="#0A5ED6" /></linearGradient></defs>
+      <rect width="512" height="512" rx="112" fill={`url(#${gid})`} />
+      <circle cx="256" cy="256" r="132" fill="none" stroke="#fff" strokeOpacity="0.3" strokeWidth="40" />
+      <circle cx="256" cy="256" r="132" fill="none" stroke="#fff" strokeWidth="40" strokeLinecap="round" strokeDasharray="622 830" transform="rotate(-90 256 256)" />
+      <path d="M194 262l45 45 82-94" fill="none" stroke="#fff" strokeWidth="40" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

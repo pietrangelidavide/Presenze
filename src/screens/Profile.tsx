@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { ImageError, readImage, renderAvatar, type LoadedImage } from '../lib/image';
 import { NAME_MAX, fitCrop, zoomAround, type Crop } from '../lib/profile';
+import { isBoss } from '../lib/team';
+import { LEVEL_LABEL } from '../lib/types';
+import { go } from '../route';
 import { makePeriod, summarize } from '../lib/stats';
 import { dur, durSigned } from '../lib/time';
 import { useStore } from '../state';
@@ -15,6 +18,7 @@ export function Profile() {
   const [savingName, setSavingName] = useState(false);
   const [picked, setPicked] = useState<LoadedImage | null>(null);
   const [busy, setBusy] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // se il nome cambia da fuori (primo caricamento) il campo lo segue, finché non lo si tocca
@@ -105,6 +109,29 @@ export function Profile() {
           </form>
         </section>
       </div>
+
+      {s.team.status === 'ready' && s.team.me ? (
+        <section className="card" aria-label="Il tuo posto nel team">
+          <div className="card-head"><div><h2>Team</h2><p className="card-sub">La persona che sei nel team.</p></div></div>
+          <div className="row wrap">
+            <span style={{ flex: 1, minWidth: 0 }}><b>{s.team.me.name}</b> <span className="muted">· {LEVEL_LABEL[s.team.me.level]}</span></span>
+            {leaving ? null : <button type="button" className="btn sm" onClick={() => setLeaving(true)}>Cambia persona</button>}
+          </div>
+          <p className="muted" style={{ fontSize: 13.5, marginTop: 10 }}>
+            {isBoss(s.team.me.id)
+              ? 'Gli orari del capo non sono visibili ai colleghi.'
+              : s.team.shared ? 'I colleghi vedono i tuoi orari di entrata e uscita. ' : 'I colleghi non vedono i tuoi orari. '}
+            {isBoss(s.team.me.id) ? null : <button type="button" className="linkbtn" onClick={() => go('team')}>Cambia dalla pagina Team</button>}
+          </p>
+          {leaving ? (
+            <div className="warn" style={{ marginTop: 12 }}>
+              <span>Lasciare {s.team.me.name}? Poi dovrai scegliere di nuovo chi sei: i tuoi dati restano nell’account.</span>
+              <button type="button" className="btn sm" onClick={() => void s.releaseMember()}>Sì, cambia</button>
+              <button type="button" className="btn sm" onClick={() => setLeaving(false)}>No</button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="card" aria-label="Account">
         <div className="row wrap">

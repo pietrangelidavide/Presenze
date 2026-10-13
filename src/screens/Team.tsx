@@ -1,187 +1,212 @@
-import { useState } from 'react';
-import { LEVEL_HINT, LEVEL_LABEL, LEVEL_ORDER, TEAM_MAX, type TeamLevel, type TeamMember } from '../lib/types';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ROSTER, SHARED_LABEL, isBoss, toShared, type RosterEntry, type RosterMember, type SharedDay, type SharedMode } from '../lib/team';
+import { addDays, dayLong, dayMonth, mondayOf, weekday, WEEKDAY_SHORT } from '../lib/time';
+import { LEVEL_LABEL, LEVEL_ORDER } from '../lib/types';
 import { useStore } from '../state';
-import { Avatar, Icon, Segmented, Sheet } from '../ui';
+import { Avatar, Icon, Sheet, Toggle } from '../ui';
 
-type Target = { member: TeamMember } | { level: TeamLevel } | null;
-type Filter = 'all' | TeamLevel;
-
-const matches = (m: TeamMember, q: string): boolean => {
-  const t = q.trim().toLowerCase();
-  if (!t) return true;
-  return [m.name, m.role, m.contact, m.note].some((v) => !!v && v.toLowerCase().includes(t));
+const SHARED_COLOR: Record<SharedMode, string> = {
+  office: 'var(--v-ufficio)', smart: 'var(--v-smart)', vacation: 'var(--v-ferie)', absent: 'var(--muted)', holiday: 'var(--v-festivo)',
 };
+
+/** Quello che si sa di una persona in un giorno. */
+type Cell =
+  | { t: 'day'; d: Omit<SharedDay, 'member'> | null }   // orari visibili (null: nessuna registrazione)
+  | { t: 'hidden' }                                       // ha scelto di non condividerli
+  | { t: 'boss' }                                         // gli orari del capo non si vedono mai
+  | { t: 'unclaimed' };                                   // nessun account ha ancora scelto questa persona
+
+const times = (d: Omit<SharedDay, 'member'>): string => {
+  if (d.mode !== 'office' && d.mode !== 'smart') return '';
+  if (d.clockIn && d.clockOut) return `${d.clockIn}–${d.clockOut}`;
+  if (d.clockIn) return `dalle ${d.clockIn}`;
+  return d.mode === 'smart' ? 'Giornata intera' : '';
+};
+
+function Status({ cell, day }: { cell: Cell; day: string }) {
+  if (cell.t === 'boss') return <><Icon name="lock" size={14} className="tm-lock" /> Orari non visibili</>;
+  if (cell.t === 'hidden') return <><Icon name="lock" size={14} className="tm-lock" /> Orario nascosto</>;
+  if (cell.t === 'unclaimed') return <>Non ancora nel team</>;
+  if (!cell.d) return <>{weekday(day) > 5 ? '–' : 'Nessuna registrazione'}</>;
+  return <><i className="mode-dot" style={{ background: SHARED_COLOR[cell.d.mode] }} />{SHARED_LABEL[cell.d.mode]}</>;
+}
 
 export function Team() {
   const s = useStore();
-  const team = s.data.team;
-  const [target, setTarget] = useState<Target>(null);
-  const [filter, setFilter] = useState<Filter>('all');
-  const [query, setQuery] = useState('');
+  const { team, today } = s;
+  const [day, setDay] = useState(today);
+  const [sheet, setSheet] = useState<string | null>(null);
+  const week = mondayOf(day);
 
-  const count = (l: TeamLevel) => team.filter((m) => m.level === l).length;
-  const full = team.length >= TEAM_MAX;
-  const levels = filter === 'all' ? LEVEL_ORDER : LEVEL_ORDER.filter((l) => l === filter);
-  const searching = query.trim() !== '';
-  const open = (t: Target) => { if (t && 'level' in t && full) { s.toast(`Hai raggiunto il massimo di ${TEAM_MAX} persone.`, true); return; } setTarget(t); };
+  // ── orari dei colleghi per la settimana del giorno scelto ──
+  const [fetched, setFetched] = useState<{ week: string; days: SharedDay[] } | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+
+  const load = useCallback(async (w: string) => {
+    try {
+      const days = await s.teamDays(w, addDays(w, 6));
+      if (alive.current) { setFetched({ week: w, days }); setFailed(null); }
+    } catch (e) {
+      if (alive.current) setFailed(e instanceof Error ? e.message : 'Non riesco a leggere gli orari del team.');
+    }
+  }, [s.teamDays]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ready = team.status === 'ready';
+  useEffect(() => {
+    if (!ready) return;
+    void load(week);
+    const tick = () => { if (document.visibilityState === 'visible') void load(week); };
+    const id = window.setInterval(tick, 60_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', tick); };
+  }, [ready, week, load, team.roster]);
+
+  const loading = ready && (!fetched || fetched.week !== week) && !failed;
+  const shared = fetched && fetched.week === week ? fetched.days : [];
+  const entryOf = useMemo(() => new Map(team.roster.map((r) => [r.id, r] as const)), [team.roster]);
+  const mineDay = useCallback((d: string): Omit<SharedDay, 'member'> | null => {
+    const e = s.data.days.find((x) => x.day === d);
+    return e ? toShared(e) : null;
+  }, [s.data.days]);
+
+  const cellOf = useCallback((m: RosterMember, d: string): Cell => {
+    const r: RosterEntry | undefined = entryOf.get(m.id);
+    if (r?.mine) return { t: 'day', d: mineDay(d) };
+    if (isBoss(m.id)) return { t: 'boss' };
+    if (!r?.claimed) return { t: 'unclaimed' };
+    if (!r.shared) return { t: 'hidden' };
+    const found = shared.find((x) => x.member === m.id && x.day === d);
+    return { t: 'day', d: found ? { day: found.day, mode: found.mode, clockIn: found.clockIn, clockOut: found.clockOut } : null };
+  }, [entryOf, mineDay, shared]);
+
+  const rel = day === today ? 'Oggi' : day === addDays(today, -1) ? 'Ieri' : day === addDays(today, 1) ? 'Domani' : null;
+
+  // quanti ci sono, tra chi mostra gli orari
+  const counts = useMemo(() => {
+    const c: Partial<Record<SharedMode, number>> = {};
+    for (const m of ROSTER) {
+      const cell = cellOf(m, day);
+      if (cell.t === 'day' && cell.d) c[cell.d.mode] = (c[cell.d.mode] ?? 0) + 1;
+    }
+    return c;
+  }, [cellOf, day]);
+
+  if (team.status === 'unavailable') {
+    return (
+      <div className="stack">
+        <header className="page-head"><div><h1>Team</h1><p className="sub">Gli orari dei colleghi, giorno per giorno.</p></div></header>
+        <section className="card empty" aria-label="Team non disponibile">
+          <b>Il team non è ancora attivo</b>
+          <span>{team.error}</span>
+          <button type="button" className="btn primary" onClick={() => void s.refreshTeam()}>Riprova</button>
+        </section>
+      </div>
+    );
+  }
+
+  const me = team.me;
+  const sheetMember = sheet ? ROSTER.find((m) => m.id === sheet) ?? null : null;
 
   return (
     <div className="stack">
       <header className="page-head">
         <div>
           <h1>Team</h1>
-          <p className="sub">Le persone con cui lavori, divise in Capo, Senior e Junior.</p>
+          <p className="sub">Gli orari dei colleghi, giorno per giorno.</p>
         </div>
-        <div className="actions"><button type="button" className="btn primary" onClick={() => open({ level: filter === 'all' ? 'junior' : filter })}><Icon name="plus" size={18} /> Aggiungi persona</button></div>
       </header>
 
-      {team.length === 0 ? (
-        <section className="card empty" aria-label="Team vuoto">
-          <b>Il tuo team è ancora vuoto</b>
-          <span>Aggiungi le persone con cui lavori e scegli per ognuna se è Capo, Senior o Junior. Restano tue: nessuno le vede.</span>
-          <button type="button" className="btn primary" onClick={() => open({ level: 'capo' })}><Icon name="plus" size={18} /> Aggiungi la prima persona</button>
-        </section>
-      ) : (
-        <>
-          <section className="card tm-filter" aria-label="Filtro del team">
-            <Segmented<Filter>
-              label="Mostra"
-              value={filter}
-              onChange={setFilter}
-              options={[
-                { value: 'all', label: <>Tutti <span className="seg-n">{team.length}</span></> },
-                ...LEVEL_ORDER.map((l) => ({ value: l as Filter, label: <>{LEVEL_LABEL[l]} <span className="seg-n">{count(l)}</span></> })),
-              ]}
-            />
-            {team.length >= 8 ? (
-              <div className="field" style={{ marginTop: 14 }}>
-                <label htmlFor="tm-search">Cerca nel team</label>
-                <input id="tm-search" type="text" inputMode="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nome, mansione, contatto…" autoComplete="off" />
-              </div>
-            ) : null}
-          </section>
-
-          {levels.map((l) => {
-            const list = team.filter((m) => m.level === l && matches(m, query));
-            return (
-              <section key={l} aria-labelledby={`tm-${l}`}>
-                <div className="tm-head">
-                  <h2 id={`tm-${l}`} className="section-title">{LEVEL_LABEL[l]}</h2>
-                  <span className={`badge lvl-${l}`}>{list.length}</span>
-                  <span className="muted tm-hint">{LEVEL_HINT[l]}</span>
-                  <button type="button" className="iconbtn" onClick={() => open({ level: l })} aria-label={`Aggiungi una persona come ${LEVEL_LABEL[l]}`} title={`Aggiungi come ${LEVEL_LABEL[l]}`}><Icon name="plus" /></button>
-                </div>
-                {list.length ? (
-                  <div className="plist">
-                    {list.map((m) => (
-                      <button type="button" key={m.id} className="titem" onClick={() => open({ member: m })} aria-label={`${m.name}, ${LEVEL_LABEL[m.level]}${m.role ? `, ${m.role}` : ''}: modifica`}>
-                        <Avatar src={null} name={m.name} size={44} className={`lvl-${m.level}`} />
-                        <span style={{ minWidth: 0 }}>
-                          <b className="tname">{m.name}</b>
-                          {m.role ? <span className="tsub">{m.role}</span> : null}
-                          {m.contact || m.note ? <span className="tsub">{[m.contact, m.note].filter(Boolean).join(' · ')}</span> : null}
-                        </span>
-                        <Icon name="chevR" size={18} className="tchev" />
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="tm-none">{searching ? 'Nessuno corrisponde alla ricerca.' : `Nessun ${LEVEL_LABEL[l]} per ora.`}</p>
-                )}
-              </section>
-            );
-          })}
-        </>
-      )}
-
-      {target ? <MemberEditor key={'member' in target ? target.member.id : `new-${target.level}`} target={target} onClose={() => setTarget(null)} /> : null}
-    </div>
-  );
-}
-
-// ───────────────────────── aggiungi o modifica una persona ─────────────────────────
-function MemberEditor({ target, onClose }: { target: Exclude<Target, null>; onClose: () => void }) {
-  const s = useStore();
-  const existing = 'member' in target ? target.member : null;
-  const [name, setName] = useState(existing?.name ?? '');
-  const [level, setLevel] = useState<TeamLevel>(existing?.level ?? ('level' in target ? target.level : 'junior'));
-  const [role, setRole] = useState(existing?.role ?? '');
-  const [contact, setContact] = useState(existing?.contact ?? '');
-  const [note, setNote] = useState(existing?.note ?? '');
-  const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const cleanName = name.trim().replace(/\s+/g, ' ');
-  const valid = cleanName.length > 0;
-  const clean = (v: string, max: number) => (v.trim() ? v.trim().slice(0, max) : null);
-  const twin = s.data.team.some((m) => m.id !== existing?.id && m.name.toLowerCase() === cleanName.toLowerCase());
-
-  const save = async () => {
-    if (!valid || saving) return;
-    setSaving(true);
-    const ok = await s.saveMember({ ...(existing ? { id: existing.id } : {}), name: cleanName.slice(0, 60), level, role: clean(role, 60), contact: clean(contact, 80), note: clean(note, 300) });
-    setSaving(false);
-    if (ok) { onClose(); s.toast(existing ? 'Persona aggiornata' : `${cleanName.split(' ')[0]} è nel team come ${LEVEL_LABEL[level]}`); }
-  };
-  const remove = async () => {
-    if (!existing) return;
-    setSaving(true);
-    const ok = await s.deleteMember(existing.id);
-    setSaving(false);
-    if (ok) { onClose(); s.toast('Persona tolta dal team'); }
-  };
-
-  return (
-    <Sheet
-      title={existing ? 'Modifica persona' : 'Nuova persona'}
-      labelledBy="member-title"
-      onClose={onClose}
-      footer={<>
-        <button type="button" className="btn" onClick={onClose}>Annulla</button>
-        <button type="button" className="btn primary" onClick={() => void save()} disabled={!valid || saving}>{saving ? 'Salvo…' : 'Salva'}</button>
-      </>}
-    >
-      <form className="stack" onSubmit={(e) => { e.preventDefault(); void save(); }}>
-        <div className="field">
-          <label htmlFor="tm-name">Nome e cognome</label>
-          <input id="tm-name" type="text" autoComplete="off" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-invalid={!valid && name !== ''} />
-          {twin ? <span className="hint">C’è già una persona con questo nome nel team.</span> : null}
-        </div>
-
-        <div className="field">
-          <span className="label" id="lbl-level">Livello</span>
-          <div className="chips" role="group" aria-labelledby="lbl-level">
-            {LEVEL_ORDER.map((l) => <button type="button" key={l} className="chip" aria-pressed={level === l} onClick={() => setLevel(l)}>{LEVEL_LABEL[l]}</button>)}
+      {me ? (
+        <section className="card tm-me" aria-label="I tuoi orari nel team">
+          <div className="tm-me-top">
+            <Avatar src={s.avatar} name={me.name} size={48} className={`lvl-${me.level}`} />
+            <div><b>Sei {me.name}</b><span className="muted">{LEVEL_LABEL[me.level]}</span></div>
           </div>
-          <span className="hint">{LEVEL_HINT[level]}.</span>
+          {isBoss(me.id) ? (
+            <p className="tm-me-note"><Icon name="lock" size={16} /><span>Gli orari del capo non sono visibili ai colleghi. Tu vedi quelli di chi li condivide.</span></p>
+          ) : (
+            <Toggle
+              label="Mostra i miei orari ai colleghi"
+              checked={team.shared}
+              onChange={(v) => { void s.setShared(v); }}
+              hint={team.shared ? 'Vedono dove lavori e gli orari di entrata e uscita. Note, permessi e saldo ore restano tuoi.' : 'I colleghi non vedono i tuoi orari: al tuo posto leggono «Orario nascosto».'}
+            />
+          )}
+        </section>
+      ) : null}
+
+      <div className="daynav" role="group" aria-label="Giorno">
+        <button type="button" className="iconbtn" onClick={() => setDay(addDays(day, -1))} aria-label="Giorno precedente"><Icon name="chevL" /></button>
+        <div className="daynav-label" aria-live="polite">
+          <b>{rel ?? dayLong(day).split(' ')[0]}</b>
+          <small>{rel ? dayLong(day) : dayLong(day).split(' ').slice(1).join(' ')}</small>
         </div>
+        <button type="button" className="iconbtn" onClick={() => setDay(addDays(day, 1))} aria-label="Giorno successivo"><Icon name="chevR" /></button>
+        {day !== today ? <button type="button" className="btn sm" onClick={() => setDay(today)}>Oggi</button> : null}
+      </div>
 
-        <div className="field">
-          <label htmlFor="tm-role">Mansione (facoltativa)</label>
-          <input id="tm-role" type="text" maxLength={60} value={role} onChange={(e) => setRole(e.target.value)} placeholder="Per esempio: analista, sviluppatore" />
-        </div>
+      {Object.keys(counts).length ? (
+        <p className="tm-summary" aria-label="Chi c'è">
+          {(['office', 'smart', 'vacation', 'absent', 'holiday'] as SharedMode[]).filter((k) => counts[k]).map((k) => (
+            <span key={k}><i className="mode-dot" style={{ background: SHARED_COLOR[k] }} />{SHARED_LABEL[k]} <b>{counts[k]}</b></span>
+          ))}
+        </p>
+      ) : null}
 
-        <div className="field">
-          <label htmlFor="tm-contact">Contatto (facoltativo)</label>
-          <input id="tm-contact" type="text" maxLength={80} value={contact} onChange={(e) => setContact(e.target.value)} placeholder="Email o telefono" autoComplete="off" />
-        </div>
+      {failed ? (
+        <div className="warn bad" role="alert"><Icon name="alert" size={18} /><span>{failed}</span><button type="button" className="btn sm" onClick={() => void load(week)}>Riprova</button></div>
+      ) : null}
 
-        <div className="field">
-          <label htmlFor="tm-note">Nota (facoltativa)</label>
-          <textarea id="tm-note" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} />
-        </div>
+      {LEVEL_ORDER.map((l) => (
+        <section key={l} aria-labelledby={`tm-${l}`}>
+          <div className="tm-head">
+            <h2 id={`tm-${l}`} className="section-title">{LEVEL_LABEL[l]}</h2>
+          </div>
+          <div className="plist">
+            {ROSTER.filter((m) => m.level === l).map((m) => {
+              const cell = cellOf(m, day);
+              const mine = entryOf.get(m.id)?.mine ?? false;
+              const open = cell.t === 'day';
+              const right = cell.t === 'day' && cell.d ? times(cell.d) : '';
+              const body = (
+                <>
+                  <Avatar src={mine ? s.avatar : null} name={m.name} size={44} className={`lvl-${m.level}`} />
+                  <span style={{ minWidth: 0 }}>
+                    <b className="tname">{m.name}{mine ? <span className="badge plain tm-you">Tu</span> : null}{mine && !team.shared && !isBoss(m.id) ? <span className="badge plain tm-you"><Icon name="lock" size={12} /> Nascosto</span> : null}</b>
+                    <span className="tsub">{loading && cell.t === 'day' && !mine ? 'Carico…' : <Status cell={cell} day={day} />}</span>
+                  </span>
+                  <span className="trow-right">{right ? <span className="num">{right}</span> : null}{open ? <Icon name="chevR" size={18} className="tchev" /> : null}</span>
+                </>
+              );
+              return open
+                ? <button type="button" key={m.id} className="trow" onClick={() => setSheet(m.id)} aria-label={`${m.name}, ${LEVEL_LABEL[m.level]}: vedi la settimana`}>{body}</button>
+                : <div key={m.id} className={`trow ${cell.t === 'unclaimed' ? 'dim' : ''}`}>{body}</div>;
+            })}
+          </div>
+        </section>
+      ))}
 
-        <button type="submit" hidden aria-hidden="true" tabIndex={-1}>Salva</button>
+      <p className="muted tm-foot"><Icon name="info" size={16} /><span>Si vede solo il tipo di giornata e gli orari di entrata e uscita. Una malattia compare come «Assente».</span></p>
 
-        {existing ? (
-          confirmDelete ? (
-            <div className="warn bad"><span>Togliere {existing.name} dal team?</span>
-              <button type="button" className="btn sm danger" onClick={() => void remove()}>Sì, togli</button>
-              <button type="button" className="btn sm" onClick={() => setConfirmDelete(false)}>No</button>
-            </div>
-          ) : <button type="button" className="btn sm danger" style={{ justifySelf: 'start' }} onClick={() => setConfirmDelete(true)}><Icon name="trash" size={16} /> Togli dal team</button>
-        ) : null}
-      </form>
-    </Sheet>
+      {sheetMember ? (
+        <Sheet title={<>{sheetMember.name}<span className="sheet-sub">Settimana {dayMonth(week)} – {dayMonth(addDays(week, 6))}</span></>} labelledBy="tm-week-title" onClose={() => setSheet(null)}>
+          <div className="plist">
+            {Array.from({ length: 7 }, (_, i) => addDays(week, i)).map((d, i) => {
+              const cell = cellOf(sheetMember, d);
+              const right = cell.t === 'day' && cell.d ? times(cell.d) : '';
+              return (
+                <div key={d} className={`trow ${d === today ? 'is-today' : ''}`}>
+                  <span className="wk-day"><small>{WEEKDAY_SHORT[i]}</small><b className="num">{Number(d.slice(8))}</b></span>
+                  <span className="tsub tsub-main"><Status cell={cell} day={d} /></span>
+                  <span className="trow-right">{right ? <span className="num">{right}</span> : null}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Sheet>
+      ) : null}
+    </div>
   );
 }

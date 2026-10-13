@@ -6,7 +6,7 @@ Funziona su telefono e computer, segue il tema chiaro/scuro del dispositivo (o l
 
 ## Cosa fa
 
-- **Oggi**: un tasto per entrare e uno per uscire, con l'ora di uscita prevista, la settimana in corso e la banca ore.
+- **Oggi**: un tasto per entrare e uno per uscire, con l'ora di uscita prevista, la settimana in corso e la banca ore. In smart working basta un tocco su *Registra smart working*: la giornata vale le ore previste, senza orari.
 - **Calendario**: tutto il mese con le ore di ogni giorno e il totale di ogni settimana. Si tocca un giorno per correggerlo.
 - **Permessi**: ore di permesso con durata, orario e motivo; il permesso riduce le ore previste di quel giorno. Monte permessi annuo facoltativo.
 - **Smart working**: massimo 2 giorni a settimana (modificabile). Se si supera il limite l'app avvisa, ma lascia salvare.
@@ -20,7 +20,7 @@ Funziona su telefono e computer, segue il tema chiaro/scuro del dispositivo (o l
   - ogni grafico ha la vista **tabella** e si esplora anche con la tastiera (frecce)
   - esportazione **CSV** di giornate e permessi
 - **Profilo**: foto come sui social (la scegli dalla galleria o la scatti, poi la sposti e la ingrandisci), nome e qualche numero. La foto resta visibile in alto in ogni schermata (nella barra laterale sul computer).
-- **Team**: le persone con cui lavori, divise in **Capo**, **Senior** e **Junior**, ognuna con mansione, contatto e nota facoltativi. Si aggiungono, si modificano (anche cambiando livello) e si tolgono dalla pagina Team. Sono appunti tuoi: le persone indicate non hanno un account e non vedono nulla. Con Supabase serve rilanciare `supabase/setup.sql` per creare la tabella `presenze_team`.
+- **Team**: il team è fisso (Carlo capo; Fortunato, Serena, Fabio, Manuela, Angelo e Alessandro senior; Davide, Roberta e Irene junior, vedi `ROSTER` in `src/lib/team.ts`). Dopo la registrazione con email e password si sceglie quale persona si è (una sola, e solo se è libera). Nella pagina Team si vedono gli orari dei colleghi giorno per giorno e, toccando una persona, la sua settimana. Gli orari del **capo** non sono mai visibili; ognuno può **nascondere i propri** con un interruttore (di base sono visibili). Ai colleghi arrivano solo il tipo di giornata (sede, smart working, ferie, assente) e gli orari di entrata e uscita: mai note, permessi, pausa o saldo ore, e una malattia compare come «Assente».
 - **Impostazioni**: orario settimanale, limite smart working, monte permessi, festività nazionali, data di inizio conteggio, saldo di partenza, tema, copia di sicurezza (JSON) e ripristino.
 
 ## Come si calcolano le ore
@@ -43,7 +43,7 @@ Orario di partenza: **36 ore nette a settimana**.
 
 ## Stile Apple (ramo `stile-apple`)
 
-Sul ramo `stile-apple` l'interfaccia ha un aspetto ispirato ad Apple: superfici piatte e arrotondate, titoli grandi, barre traslucide, liste raggruppate, interruttori e segmenti come su iOS, blu di sistema come unico colore d'azione, tema chiaro e scuro. Nella schermata *Oggi* le ore della giornata sono un anello di avanzamento. Funzioni, calcoli e dati sono gli stessi del ramo `main`: cambiano solo `src/tokens.css`, `src/styles.css` e qualche componente (`src/ui.tsx`, `src/App.tsx`, `src/screens/Today.tsx`, `src/screens/Auth.tsx`). Le icone dell'app non sono cambiate. Per adottarlo basta unire il ramo in `main`.
+Sul ramo `stile-apple` l'interfaccia ha un aspetto ispirato ad Apple: superfici piatte e arrotondate, titoli grandi, barre traslucide, liste raggruppate, interruttori e segmenti come su iOS, blu di sistema come unico colore d'azione, tema chiaro e scuro. Nella schermata *Oggi* le ore della giornata sono un anello di avanzamento. I calcoli delle ore e il formato dei dati sono quelli del ramo `main`. Sullo stesso ramo ci sono anche il team condiviso (sezione *Team*, qui sotto) e lo smart working a un tocco in *Oggi*. L'icona è nuova (anello di avanzamento con spunta, blu): si rifà con `node scripts/icons.mjs` (varianti `scuro` e `verde` con lo stesso disegno). Per adottarlo basta unire il ramo in `main`.
 
 `npm run preview:build` compila l'app in una pagina sola (`dist/anteprima.html`, con un account di prova e dati di esempio già pronti), senza bisogno di Vite: utile per provarla al volo o per mostrarla.
 
@@ -70,7 +70,7 @@ Altri comandi:
 ## Usarla su telefono e computer con gli stessi dati (Supabase)
 
 1. Crea un progetto gratuito su [supabase.com](https://supabase.com).
-2. **SQL Editor** → incolla tutto il contenuto di `supabase/setup.sql` → **Run**. Si può rilanciare senza danni (rilancialo dopo ogni aggiornamento dell'app: ora crea anche la tabella del profilo). Ogni persona vede solo i propri dati (Row Level Security).
+2. **SQL Editor** → incolla tutto il contenuto di `supabase/setup.sql` → **Run**. Si può rilanciare senza danni (rilancialo dopo ogni aggiornamento dell'app: ora crea anche le tabelle del team). Ogni persona vede solo i propri dati (Row Level Security); i colleghi vedono soltanto gli orari condivisi, e solo attraverso la funzione `presenze_team_days`.
 3. **Project Settings → API**: copia *Project URL* e la chiave *anon public*.
 4. Copia `.env.example` in `.env` e compila:
 
@@ -85,9 +85,12 @@ Altri comandi:
 
 5. **Authentication → Sign In / Providers → Email**: lascia attivo l'accesso con email e password. Se non vuoi dover confermare l'email, disattiva *Confirm email*.
 6. **Authentication → URL Configuration**: come *Site URL* metti l'indirizzo dell'app pubblicata (serve per il link "Ho dimenticato la password").
-7. Riavvia `npm run dev`: la pagina di accesso ora usa gli account veri di Supabase (registrazione con nome, email e password, "Ho dimenticato la password" via email).
+7. Riavvia `npm run dev`: la pagina di accesso ora usa gli account veri di Supabase (registrazione con email e password, poi la scelta della persona nel team, "Ho dimenticato la password" via email).
 
-Se vuoi che nessun altro possa registrarsi, dopo aver creato il tuo account disattiva *Allow new users to sign up*.
+**Importante per il team:** chi si registra e sceglie una persona libera vede gli orari dei colleghi. Per questo conviene far entrare solo chi deve, in uno di questi due modi (o entrambi):
+
+- **Codice del team**: nel SQL Editor esegui `insert into public.presenze_config (key, value) values ('team_code', 'un-codice-lungo') on conflict (key) do update set value = excluded.value;`. Da quel momento, per scegliere la propria persona serve il codice (l'app lo chiede da sola). Per toglierlo: `delete from public.presenze_config where key = 'team_code';`.
+- Quando tutti si sono registrati, disattiva *Allow new users to sign up* in Supabase.
 
 I dati che avevi in modalità locale si possono portare nell'account: *Copia di sicurezza* da Impostazioni (con l'account locale), poi *Ripristina da copia* dopo l'accesso con Supabase.
 
@@ -111,8 +114,8 @@ Le pagine usano indirizzi con `#` (per esempio `/#/dashboard`), quindi non servo
 - Grafici disegnati a mano in SVG (nessuna libreria), stile blu notte, giallo e blu cobalto (ispirato ai colori di Poste Italiane, senza usarne il logo) con tema automatico chiaro/scuro
 
 ```
-src/lib/       regole di calcolo (calc), statistiche (stats), salvataggio (store), account locali (accounts), festività, dati di esempio
-src/screens/   Oggi, Calendario, Dashboard, Permessi, Team, Impostazioni, Profilo, editor di giornata e permesso
+src/lib/       regole di calcolo (calc), statistiche (stats), salvataggio (store), account locali (accounts), team condiviso (team), festività, dati di esempio
+src/screens/   Oggi, Calendario, Dashboard, Permessi, Team, Impostazioni, Profilo, scelta della persona (Pick), editor di giornata e permesso
 src/components/charts/   grafici (barre, linee, intervalli, mappa dell'anno, barre orizzontali)
 supabase/setup.sql       tabelle e regole di sicurezza
 tests/                   test delle regole di calcolo
@@ -128,7 +131,7 @@ L'app web viene impacchettata in un'app iOS con [Capacitor](https://capacitorjs.
 
 ```
 capacitor.config.ts   id dell'app (it.pietrangeli.presenze) e cartella web
-assets/               icona 1024 senza trasparenza e schermata di avvio
+assets/               icona 1024 senza trasparenza e schermata di avvio (generate da scripts/icons.mjs)
 scripts/ios-prepare.sh  crea il progetto iOS, copia l'app web e imposta Info.plist
 codemagic.yaml        build cloud: firma, crea l'IPA e lo carica su TestFlight
 ```

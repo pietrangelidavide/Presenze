@@ -20,8 +20,8 @@ test('registrazione: crea l’account, apre la sessione e non salva la password 
   const book = new AccountBook(st);
   let changes = 0;
   book.subscribe(() => changes++);
-  const u = await book.signUp({ name: '  Davide   Rossi ', email: ' Davide@Example.IT ', password: 'segreta1' });
-  assert.equal(u.name, 'Davide Rossi');
+  const u = await book.signUp({ email: ' Davide@Example.IT ', password: 'segreta1' });
+  assert.equal(u.name, 'davide');                       // il nome vero arriva scegliendo la persona del team
   assert.equal(u.email, 'davide@example.it');
   assert.deepEqual(book.session(), u);
   assert.equal(changes, 1);
@@ -34,9 +34,8 @@ test('registrazione: crea l’account, apre la sessione e non salva la password 
 
 test('registrazione: rifiuta dati incompleti e email già usate', async () => {
   const book = new AccountBook(memoryStorage());
-  await assert.rejects(book.signUp({ name: '', email: 'a@b.it', password: 'segreta1' }), /nome/i);
-  await assert.rejects(book.signUp({ name: 'A', email: 'a@b', password: 'segreta1' }), /email/i);
-  await assert.rejects(book.signUp({ name: 'A', email: 'a@b.it', password: '123' }), /almeno 6/);
+  await assert.rejects(book.signUp({ email: 'a@b', password: 'segreta1' }), /email/i);
+  await assert.rejects(book.signUp({ email: 'a@b.it', password: '123' }), /almeno 6/);
   await book.signUp({ name: 'A', email: 'a@b.it', password: 'segreta1' });
   await assert.rejects(book.signUp({ name: 'B', email: 'A@B.it', password: 'altra-pass' }), (e: unknown) => e instanceof AuthError && /già un account/.test(e.message));
   assert.equal(book.count(), 1);

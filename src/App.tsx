@@ -4,6 +4,7 @@ import { Calendar } from './screens/Calendar';
 import { Dashboard } from './screens/Dashboard';
 import { DayEditor } from './screens/DayEditor';
 import { PermitEditor } from './screens/PermitEditor';
+import { Pick } from './screens/Pick';
 import { Permits } from './screens/Permits';
 import { Profile } from './screens/Profile';
 import { Settings } from './screens/Settings';
@@ -35,6 +36,7 @@ function Shell() {
 
   if (s.boot === 'loading') return <div className="auth" role="status" aria-live="polite"><Backdrop /><p className="muted">Carico i tuoi dati…</p></div>;
   if (s.boot === 'auth') return <Auth />;
+  if (s.boot === 'pick') return <Pick />;
   if (s.boot === 'error') {
     return (
       <div className="auth"><Backdrop /><div className="card stack" role="alert">

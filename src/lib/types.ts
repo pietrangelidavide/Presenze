@@ -42,20 +42,10 @@ export interface Settings {
 /** Livello di una persona del team. */
 export type TeamLevel = 'capo' | 'senior' | 'junior';
 
-export interface TeamMember {
-  id: string;
-  name: string;
-  level: TeamLevel;
-  role: string | null;      // mansione, per esempio "Analista antifrode"
-  contact: string | null;   // email o telefono, scritti come testo libero
-  note: string | null;
-}
-
 export interface Data {
   settings: Settings;
   days: DayEntry[];
   permits: Permit[];
-  team: TeamMember[];
 }
 
 export const MODE_LABEL: Record<Mode, string> = {
@@ -88,5 +78,3 @@ export const LEVEL_HINT: Record<TeamLevel, string> = {
   senior: 'Lavora in autonomia e affianca i junior',
   junior: 'Sta crescendo, lavora con una guida',
 };
-
-export const TEAM_MAX = 200;

@@ -3,14 +3,28 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { makeCtx, type Ctx } from './lib/calc';
 import { accountBook } from './lib/accounts';
 import { CloudProfile, EMPTY_PROFILE, LocalProfile, sanitizeAvatar, sanitizeName, type Profile, type ProfileApi } from './lib/profile';
-import { CloudRepo, LocalRepo, newId, sanitizeData, sortTeam, type Repo } from './lib/store';
+import { CloudRepo, LocalRepo, sanitizeData, type Repo } from './lib/store';
+import { CloudTeam, LocalTeam, TeamError, rosterMember, type RosterEntry, type RosterMember, type SharedDay, type TeamApi } from './lib/team';
 import { buildTimeline, type Timeline } from './lib/stats';
 import { supabase } from './lib/supabase';
 import { ymd } from './lib/time';
-import type { Data, DayEntry, Permit, Settings, TeamMember } from './lib/types';
+import type { Data, DayEntry, Permit, Settings } from './lib/types';
 
-export type Boot = 'loading' | 'auth' | 'ready' | 'error';
+/** 'pick' = ha fatto l'accesso ma non ha ancora scelto quale persona del team è. */
+export type Boot = 'loading' | 'auth' | 'pick' | 'ready' | 'error';
 export interface ToastMsg { id: number; text: string; bad: boolean }
+
+/** Il team condiviso, dal punto di vista di chi ha fatto l'accesso. */
+export interface TeamInfo {
+  /** 'unavailable': il database non ha ancora la parte del team (o non risponde): il resto dell'app funziona lo stesso. */
+  status: 'loading' | 'ready' | 'unavailable';
+  error: string | null;
+  roster: RosterEntry[];
+  /** La persona del team che sono io. */
+  me: RosterMember | null;
+  /** I miei orari sono visibili ai colleghi. */
+  shared: boolean;
+}
 
 export interface Store {
   boot: Boot;
@@ -34,9 +48,16 @@ export interface Store {
   addPermit: (p: Omit<Permit, 'id'>) => Promise<boolean>;
   updatePermit: (p: Permit) => Promise<boolean>;
   deletePermit: (id: string) => Promise<boolean>;
-  /** Aggiunge (senza `id`) o aggiorna una persona del team. */
-  saveMember: (m: Omit<TeamMember, 'id'> & { id?: string }) => Promise<boolean>;
-  deleteMember: (id: string) => Promise<boolean>;
+  team: TeamInfo;
+  /** Sceglie la persona del team che sono io. Restituisce l'errore da mostrare, o null se è andata bene. */
+  claimMember: (id: string, code?: string) => Promise<TeamError | null>;
+  /** Lascia la persona scelta, per sceglierne un'altra. */
+  releaseMember: () => Promise<boolean>;
+  /** Mostra o nasconde i miei orari ai colleghi. */
+  setShared: (shared: boolean) => Promise<boolean>;
+  /** Gli orari che i colleghi condividono nel periodo. */
+  teamDays: (from: string, to: string) => Promise<SharedDay[]>;
+  refreshTeam: () => Promise<void>;
   saveSettings: (s: Settings) => Promise<boolean>;
   replaceAll: (d: Data) => Promise<boolean>;
   clearAll: () => Promise<boolean>;
@@ -78,6 +99,7 @@ const userName = (u: { user_metadata?: Record<string, unknown> | null }): string
   return typeof n === 'string' && n.trim() ? n.trim().slice(0, 60) : null;
 };
 const todayNow = () => ymd(new Date());
+const NO_TEAM = { status: 'loading' as TeamInfo['status'], error: null as string | null, roster: [] as RosterEntry[] };
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const now = useNow();
@@ -95,6 +117,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [permitEditor, openPermit] = useState<{ permit?: Permit; day?: string } | null>(null);
   const repoRef = useRef<Repo | null>(null);
   const profileRef = useRef<ProfileApi | null>(null);
+  const teamRef = useRef<TeamApi | null>(null);
+  const [teamState, setTeamState] = useState(NO_TEAM);
   const profileData = useRef<Profile>(EMPTY_PROFILE);
   const dataRef = useRef(data);
   const warnedVolatile = useRef(false);
@@ -112,21 +136,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     let uid: string | null = null;
 
-    const start = async (repo: Repo, mail: string | null, id: string | null, who: string | null, prof: ProfileApi | null) => {
+    const start = async (repo: Repo, mail: string | null, id: string | null, who: string | null, prof: ProfileApi | null, tm: TeamApi) => {
       uid = id;
       setBoot('loading');
       try {
         // Il profilo non è indispensabile: se non si legge, l'app parte lo stesso senza foto.
         const [d, p] = await Promise.all([repo.load(), prof ? prof.load().catch((): Profile => EMPTY_PROFILE) : Promise.resolve(EMPTY_PROFILE)]);
+        // Il team non blocca l'avvio: se non si legge (database non ancora aggiornato) l'app parte lo stesso.
+        let roster: RosterEntry[] = [];
+        let teamError: string | null = null;
+        try { roster = await tm.roster(); } catch (e) { teamError = errText(e); }
         if (cancelled) return;
         repoRef.current = repo;
         profileRef.current = prof;
+        teamRef.current = tm;
         profileData.current = p;
         setEmail(mail);
         setName(p.name ?? who);
         setAvatar(p.avatar);
         setData(d);
-        setBoot('ready');
+        setTeamState(teamError ? { status: 'unavailable', error: teamError, roster: [] } : { status: 'ready', error: null, roster });
+        // Chi ha appena fatto l'accesso deve dire quale persona del team è, prima di entrare.
+        setBoot(!teamError && !roster.some((r) => r.mine) ? 'pick' : 'ready');
       } catch (e) {
         if (cancelled) return;
         setError(errText(e));
@@ -140,9 +171,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const sync = () => {
         if (cancelled) return;
         const u = book.session();
-        if (!u) { uid = null; repoRef.current = null; profileRef.current = null; setData(sanitizeData(null, todayNow())); setEmail(null); setName(null); setAvatar(null); setBoot('auth'); return; }
+        if (!u) { uid = null; repoRef.current = null; profileRef.current = null; teamRef.current = null; setTeamState(NO_TEAM); setData(sanitizeData(null, todayNow())); setEmail(null); setName(null); setAvatar(null); setBoot('auth'); return; }
         if (u.id === uid) return;
-        void start(new LocalRepo(todayNow, undefined, book.dataKey(u.id)), u.email, u.id, u.name, new LocalProfile(book, u.id));
+        void start(new LocalRepo(todayNow, undefined, book.dataKey(u.id)), u.email, u.id, u.name, new LocalProfile(book, u.id), new LocalTeam(book, u.id));
       };
       sync();
       const off = book.subscribe(sync);
@@ -151,14 +182,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const db = supabase;
     void db.auth.getSession().then(({ data: s }) => {
       if (cancelled) return;
-      if (s.session) void start(new CloudRepo(db, s.session.user.id, todayNow), s.session.user.email ?? null, s.session.user.id, userName(s.session.user), new CloudProfile(db, s.session.user.id));
+      if (s.session) void start(new CloudRepo(db, s.session.user.id, todayNow), s.session.user.email ?? null, s.session.user.id, userName(s.session.user), new CloudProfile(db, s.session.user.id), new CloudTeam(db));
       else setBoot('auth');
     });
     const { data: sub } = db.auth.onAuthStateChange((evt, session) => {
       if (cancelled) return;
-      if (evt === 'SIGNED_OUT') { uid = null; repoRef.current = null; profileRef.current = null; setData(sanitizeData(null, todayNow())); setName(null); setAvatar(null); setBoot('auth'); }
+      if (evt === 'SIGNED_OUT') { uid = null; repoRef.current = null; profileRef.current = null; teamRef.current = null; setTeamState(NO_TEAM); setData(sanitizeData(null, todayNow())); setName(null); setAvatar(null); setBoot('auth'); }
       else if (session && session.user.id !== uid && (evt === 'SIGNED_IN' || evt === 'INITIAL_SESSION')) {
-        void start(new CloudRepo(db, session.user.id, todayNow), session.user.email ?? null, session.user.id, userName(session.user), new CloudProfile(db, session.user.id));
+        void start(new CloudRepo(db, session.user.id, todayNow), session.user.email ?? null, session.user.id, userName(session.user), new CloudProfile(db, session.user.id), new CloudTeam(db));
       }
     });
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
@@ -197,11 +228,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updatePermit = useCallback((p: Permit) => commit((d) => ({ ...d, permits: d.permits.map((x) => (x.id === p.id ? p : x)) }), (r) => r.updatePermit(p)), [commit]);
   const deletePermit = useCallback((id: string) => commit((d) => ({ ...d, permits: d.permits.filter((x) => x.id !== id) }), (r) => r.deletePermit(id)), [commit]);
   const saveSettings = useCallback((s: Settings) => commit((d) => ({ ...d, settings: s }), (r) => r.saveSettings(s)), [commit]);
-  const saveMember = useCallback((m: Omit<TeamMember, 'id'> & { id?: string }) => {
-    const full: TeamMember = { ...m, id: m.id ?? newId() };
-    return commit((d) => ({ ...d, team: sortTeam([...d.team.filter((x) => x.id !== full.id), full]) }), (r) => r.saveMember(full));
-  }, [commit]);
-  const deleteMember = useCallback((id: string) => commit((d) => ({ ...d, team: d.team.filter((x) => x.id !== id) }), (r) => r.deleteMember(id)), [commit]);
   const replaceAll = useCallback((next: Data) => commit(() => next, (r) => r.replaceAll(next)), [commit]);
   const clearAll = useCallback(() => commit(() => sanitizeData(null, todayNow()), (r) => r.clearAll()), [commit]);
 
@@ -241,14 +267,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [toast]);
 
+  // ── team condiviso ──
+  const refreshTeam = useCallback(async () => {
+    const api = teamRef.current;
+    if (!api) return;
+    try { setTeamState({ status: 'ready', error: null, roster: await api.roster() }); }
+    catch (e) { setTeamState((t) => ({ ...t, status: 'unavailable', error: errText(e) })); }
+  }, []);
+
+  const claimMember = useCallback(async (id: string, code?: string): Promise<TeamError | null> => {
+    const api = teamRef.current;
+    if (!api) return new TeamError('other', 'L’account non è pronto: riprova tra un attimo.');
+    try { await api.claim(id, code); } catch (e) { return e instanceof TeamError ? e : new TeamError('other', errText(e)); }
+    await refreshTeam();
+    // Da qui in poi l'app ti chiama con il nome della persona scelta.
+    const m = rosterMember(id);
+    if (m) await saveProfile({ name: m.name });
+    setBoot('ready');
+    return null;
+  }, [refreshTeam, saveProfile]);
+
+  const releaseMember = useCallback(async (): Promise<boolean> => {
+    const api = teamRef.current;
+    if (!api) return false;
+    try { await api.release(); } catch (e) { toast(`Non sono riuscito a lasciare la persona: ${errText(e)}`, true); return false; }
+    await refreshTeam();
+    setBoot('pick');
+    return true;
+  }, [refreshTeam, toast]);
+
+  const setShared = useCallback(async (shared: boolean): Promise<boolean> => {
+    const api = teamRef.current;
+    if (!api) return false;
+    const before = teamState;
+    setTeamState((t) => ({ ...t, roster: t.roster.map((r) => (r.mine ? { ...r, shared } : r)) }));
+    try { await api.setShared(shared); return true; }
+    catch (e) { setTeamState(before); toast(`Non sono riuscito a salvare: ${errText(e)}`, true); return false; }
+  }, [teamState, toast]);
+
+  const teamDays = useCallback(async (from: string, to: string): Promise<SharedDay[]> => (teamRef.current ? teamRef.current.days(from, to) : []), []);
+
   const signOut = useCallback(async () => { if (supabase) await supabase.auth.signOut(); else accountBook().signOut(); }, []);
 
   const ctx = useMemo(() => makeCtx(data), [data]);
   const tl = useMemo(() => buildTimeline(ctx, today, 0), [ctx, today]);
 
+  const mineEntry = teamState.roster.find((r) => r.mine) ?? null;
+  const team: TeamInfo = { ...teamState, me: rosterMember(mineEntry?.id), shared: !!mineEntry?.shared };
+
   const value: Store = {
     boot, error, kind: supabase ? 'cloud' : 'local', email, name, avatar, data, ctx, tl, now, today, nowMin, toasts, toast,
-    saveDay, deleteDay, addPermit, updatePermit, deletePermit, saveMember, deleteMember, saveSettings, replaceAll, clearAll, saveProfile, signOut, reload,
+    saveDay, deleteDay, addPermit, updatePermit, deletePermit, team, claimMember, releaseMember, setShared, teamDays, refreshTeam, saveSettings, replaceAll, clearAll, saveProfile, signOut, reload,
     dayEditor, openDay, permitEditor, openPermit,
   };
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
