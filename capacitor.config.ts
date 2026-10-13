@@ -8,10 +8,10 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   ios: {
     contentInset: 'never', // la pagina gestisce da sola le aree sicure (notch e barra in basso)
-    backgroundColor: '#13162E',
+    backgroundColor: '#F5F5F7',
   },
   android: {
-    backgroundColor: '#13162E',
+    backgroundColor: '#F5F5F7',
   },
   plugins: {
     // Su Android passa alla pagina lo spazio occupato dalle barre di sistema (variabili --safe-area-inset-*)
