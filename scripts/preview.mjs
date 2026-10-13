@@ -14,7 +14,7 @@ const r = await build({
   entryPoints: [join(root, 'scripts', 'preview-entry.tsx')],
   bundle: true, format: 'iife', platform: 'browser', target: 'es2022', minify: true, jsx: 'automatic', write: false, outdir: join(dist, 'tmp'), logLevel: 'warning',
   alias: { '@supabase/supabase-js': join(root, 'tests', 'stubs', 'supabase.ts') },
-  define: { 'import.meta.env.VITE_SUPABASE_URL': 'undefined', 'import.meta.env.VITE_SUPABASE_ANON_KEY': 'undefined', 'process.env.NODE_ENV': '"production"' },
+  define: { 'import.meta.env.VITE_SUPABASE_URL': 'undefined', 'import.meta.env.VITE_SUPABASE_ANON_KEY': 'undefined', 'import.meta.env.VITE_API_BASE': 'undefined', 'process.env.NODE_ENV': '"production"' },
 });
 const js = r.outputFiles.find((f) => f.path.endsWith('.js')).text.replace(/<\/script/gi, '<\\/script');
 const css = r.outputFiles.find((f) => f.path.endsWith('.css')).text;

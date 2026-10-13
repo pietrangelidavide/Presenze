@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { makeCtx, type Ctx } from './lib/calc';
 import { accountBook } from './lib/accounts';
+import { CalendarStore, REFRESH_MIN, fetchCalendarText, normalizeLink, readCalendarText, type CalendarState } from './lib/calendar';
 import { CloudProfile, EMPTY_PROFILE, LocalProfile, sanitizeAvatar, sanitizeName, type Profile, type ProfileApi } from './lib/profile';
 import { CloudRepo, LocalRepo, sanitizeData, type Repo } from './lib/store';
 import { CloudTeam, LocalTeam, TeamError, rosterMember, type RosterEntry, type RosterMember, type SharedDay, type TeamApi } from './lib/team';
@@ -24,6 +25,16 @@ export interface TeamInfo {
   me: RosterMember | null;
   /** I miei orari sono visibili ai colleghi. */
   shared: boolean;
+}
+
+/** Il calendario collegato (le riunioni), dal punto di vista di chi ha fatto l'accesso. */
+export interface CalendarInfo {
+  /** null = nessun calendario collegato. */
+  state: CalendarState | null;
+  /** Sta scaricando il link. */
+  busy: boolean;
+  /** L'ultimo aggiornamento dal link non è riuscito: si vede ancora l'ultimo calendario letto. */
+  error: string | null;
 }
 
 export interface Store {
@@ -59,6 +70,14 @@ export interface Store {
   /** Gli orari che i colleghi condividono nel periodo. */
   teamDays: (from: string, to: string) => Promise<SharedDay[]>;
   refreshTeam: () => Promise<void>;
+  calendar: CalendarInfo;
+  /** Collega il calendario con il link «Pubblica un calendario» di Outlook. */
+  connectCalendarLink: (link: string) => Promise<boolean>;
+  /** Carica il calendario da un file .ics. */
+  loadCalendarFile: (text: string, name: string) => Promise<boolean>;
+  /** Riscarica il calendario dal link. */
+  refreshCalendar: () => Promise<boolean>;
+  disconnectCalendar: () => void;
   saveSettings: (s: Settings) => Promise<boolean>;
   replaceAll: (d: Data) => Promise<boolean>;
   clearAll: () => Promise<boolean>;
@@ -100,6 +119,8 @@ const userName = (u: { user_metadata?: Record<string, unknown> | null }): string
   return typeof n === 'string' && n.trim() ? n.trim().slice(0, 60) : null;
 };
 const todayNow = () => ymd(new Date());
+/** Indirizzo del sito che ha la funzione /api/calendar. Vuoto = lo stesso sito. Serve solo nelle app per iPhone e Android, che non sono sul sito. */
+const API_BASE = ((import.meta.env.VITE_API_BASE as string | undefined) ?? '').replace(/\/$/, '');
 const NO_TEAM = { status: 'loading' as TeamInfo['status'], error: null as string | null, roster: [] as RosterEntry[] };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -120,6 +141,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const profileRef = useRef<ProfileApi | null>(null);
   const teamRef = useRef<TeamApi | null>(null);
   const [teamState, setTeamState] = useState(NO_TEAM);
+  const calStore = useRef(new CalendarStore()).current;
+  const calUser = useRef<string | null>(null);
+  const [cal, setCal] = useState<CalendarState | null>(null);
+  const [calBusy, setCalBusy] = useState(false);
+  const [calError, setCalError] = useState<string | null>(null);
+  const calRef = useRef(cal);
+  calRef.current = cal;
+  const calTried = useRef(0);
   const profileData = useRef<Profile>(EMPTY_PROFILE);
   const dataRef = useRef(data);
   const warnedVolatile = useRef(false);
@@ -157,6 +186,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAvatar(p.avatar);
         setData(d);
         setTeamState(teamError ? { status: 'unavailable', error: teamError, roster: [] } : { status: 'ready', error: null, roster });
+        calUser.current = id ?? 'locale';
+        setCal(calStore.load(calUser.current));
+        setCalError(null);
         // Chi ha appena fatto l'accesso deve dire quale persona del team è, prima di entrare.
         setBoot(!teamError && !roster.some((r) => r.mine) ? 'pick' : 'ready');
       } catch (e) {
@@ -172,7 +204,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const sync = () => {
         if (cancelled) return;
         const u = book.session();
-        if (!u) { uid = null; repoRef.current = null; profileRef.current = null; teamRef.current = null; setTeamState(NO_TEAM); setData(sanitizeData(null, todayNow())); setEmail(null); setName(null); setAvatar(null); setBoot('auth'); return; }
+        if (!u) { uid = null; calUser.current = null; setCal(null); repoRef.current = null; profileRef.current = null; teamRef.current = null; setTeamState(NO_TEAM); setData(sanitizeData(null, todayNow())); setEmail(null); setName(null); setAvatar(null); setBoot('auth'); return; }
         if (u.id === uid) return;
         void start(new LocalRepo(todayNow, undefined, book.dataKey(u.id)), u.email, u.id, u.name, new LocalProfile(book, u.id), new LocalTeam(book, u.id));
       };
@@ -188,7 +220,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     const { data: sub } = db.auth.onAuthStateChange((evt, session) => {
       if (cancelled) return;
-      if (evt === 'SIGNED_OUT') { uid = null; repoRef.current = null; profileRef.current = null; teamRef.current = null; setTeamState(NO_TEAM); setData(sanitizeData(null, todayNow())); setName(null); setAvatar(null); setBoot('auth'); }
+      if (evt === 'SIGNED_OUT') { uid = null; calUser.current = null; setCal(null); repoRef.current = null; profileRef.current = null; teamRef.current = null; setTeamState(NO_TEAM); setData(sanitizeData(null, todayNow())); setName(null); setAvatar(null); setBoot('auth'); }
       else if (session && session.user.id !== uid && (evt === 'SIGNED_IN' || evt === 'INITIAL_SESSION')) {
         void start(new CloudRepo(db, session.user.id, todayNow), session.user.email ?? null, session.user.id, userName(session.user), new CloudProfile(db, session.user.id), new CloudTeam(db));
       }
@@ -315,6 +347,75 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const teamDays = useCallback(async (from: string, to: string): Promise<SharedDay[]> => (teamRef.current ? teamRef.current.days(from, to) : []), []);
 
+  // ── calendario delle riunioni ──
+  const saveCal = useCallback((next: CalendarState) => {
+    setCal(next);
+    if (calUser.current && !calStore.save(calUser.current, next)) toast('Il browser non conserva il calendario: lo perdi se chiudi la pagina.', true);
+  }, [calStore, toast]);
+
+  const downloadCal = useCallback(async (link: string): Promise<CalendarState> => {
+    const text = await fetchCalendarText(link, API_BASE);
+    return { source: 'link', link, name: null, updatedAt: new Date().toISOString(), events: readCalendarText(text, todayNow()) };
+  }, []);
+
+  const loadCalendarFile = useCallback(async (text: string, name: string): Promise<boolean> => {
+    try {
+      saveCal({ source: 'file', link: null, name: name.trim().slice(0, 120) || null, updatedAt: new Date().toISOString(), events: readCalendarText(text, todayNow()) });
+      setCalError(null);
+      return true;
+    } catch (e) { toast(errText(e), true); return false; }
+  }, [saveCal, toast]);
+
+  const connectCalendarLink = useCallback(async (input: string): Promise<boolean> => {
+    setCalBusy(true);
+    try {
+      const next = await downloadCal(normalizeLink(input));
+      saveCal(next);
+      setCalError(null);
+      return true;
+    } catch (e) { toast(errText(e), true); return false; }
+    finally { setCalBusy(false); }
+  }, [downloadCal, saveCal, toast]);
+
+  const refreshCal = useCallback(async (quiet: boolean): Promise<boolean> => {
+    const cur = calRef.current;
+    if (!cur?.link) return false;
+    calTried.current = Date.now();
+    setCalBusy(true);
+    try {
+      saveCal(await downloadCal(cur.link));
+      setCalError(null);
+      return true;
+    } catch (e) {
+      setCalError(errText(e));
+      if (!quiet) toast(errText(e), true);
+      return false;
+    } finally { setCalBusy(false); }
+  }, [downloadCal, saveCal, toast]);
+  const refreshCalendar = useCallback(() => refreshCal(false), [refreshCal]);
+
+  const disconnectCalendar = useCallback(() => {
+    if (calUser.current) calStore.clear(calUser.current);
+    setCal(null);
+    setCalError(null);
+  }, [calStore]);
+
+  // il link si riscarica da solo: all'apertura, quando si torna sulla pagina e ogni minuto se sono passati più di REFRESH_MIN minuti
+  const hasLink = !!cal?.link;
+  useEffect(() => {
+    if (boot !== 'ready' || !hasLink) return;
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
+      const age = Date.now() - Date.parse(calRef.current?.updatedAt ?? '');
+      if (!(age > REFRESH_MIN * 60000) || Date.now() - calTried.current < 120000) return;   // dopo un errore non si riprova prima di due minuti
+      void refreshCal(true);
+    };
+    tick();
+    const id = window.setInterval(tick, 60000);
+    document.addEventListener('visibilitychange', tick);
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', tick); };
+  }, [boot, hasLink, refreshCal]);
+
   const signOut = useCallback(async () => { if (supabase) await supabase.auth.signOut(); else accountBook().signOut(); }, []);
 
   const ctx = useMemo(() => makeCtx(data), [data]);
@@ -325,7 +426,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     boot, error, kind: supabase ? 'cloud' : 'local', email, name, avatar, data, ctx, tl, now, today, nowMin, toasts, toast,
-    saveDay, saveDays, deleteDay, addPermit, updatePermit, deletePermit, team, claimMember, releaseMember, setShared, teamDays, refreshTeam, saveSettings, replaceAll, clearAll, saveProfile, signOut, reload,
+    saveDay, saveDays, deleteDay, addPermit, updatePermit, deletePermit, team, claimMember, releaseMember, setShared, teamDays, refreshTeam, calendar: { state: cal, busy: calBusy, error: calError }, connectCalendarLink, loadCalendarFile, refreshCalendar, disconnectCalendar, saveSettings, replaceAll, clearAll, saveProfile, signOut, reload,
     dayEditor, openDay, permitEditor, openPermit,
   };
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

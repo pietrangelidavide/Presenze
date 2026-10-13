@@ -5,6 +5,7 @@ import { STATUS_LABEL, toFix } from '../lib/stats';
 import { addDays, clock, dayLong, dayShort, dur, durSigned, isoWeek, nowHm, WEEKDAY_SHORT, dayMonth } from '../lib/time';
 import { MODE_LABEL, type DayEntry, type Mode } from '../lib/types';
 import { useStore } from '../state';
+import { MeetingsToday } from './MeetingsToday';
 import { Icon, ModeDot, Ring, Segmented } from '../ui';
 
 const SHORT: Record<string, string> = { office: 'Sede', smart: 'Smart', vacation: 'Ferie', sick: 'Malattia', holiday: 'Festa' };
@@ -66,6 +67,8 @@ export function Today() {
       ) : null}
 
       <Hero info={info} mode={mode} setMode={setMode} overLimit={overLimit} smartUsed={smartUsed} limit={limit} onStart={startDay} onSmart={registerSmart} onEnd={endDay} />
+
+      <MeetingsToday />
 
       {fix.length ? (
         <section className="card" aria-label="Giorni da sistemare">

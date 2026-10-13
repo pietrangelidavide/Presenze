@@ -31,14 +31,14 @@ a { color: var(--accent-text); }
 .main { min-width: 0; padding: 14px 16px calc(100px + var(--sai-bottom)); max-width: 1180px; margin: 0 auto; width: 100%; }
 .rail { display: none; }
 .tabbar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: grid; grid-template-columns: repeat(6, 1fr);
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
   padding: 6px 4px calc(6px + var(--sai-bottom)); background: var(--nav-bg);
   border-top: 1px solid var(--hairline); -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px);
 }
-.tab { display: grid; justify-items: center; gap: 1px; padding: 4px 0 2px; border: 0; background: none; color: var(--muted); font-size: 10.5px; font-weight: 500; letter-spacing: 0; text-decoration: none; border-radius: 10px; }
+.tab { display: grid; justify-items: center; gap: 1px; min-width: 0; padding: 4px 0 2px; border: 0; background: none; color: var(--muted); font-size: 10.5px; font-weight: 500; letter-spacing: 0; text-decoration: none; border-radius: 10px; }
 .tab[aria-current="page"] { color: var(--accent-text); }
 .tab[aria-current="page"] .tab-ico svg { stroke-width: 2.2; }
-.tab-ico { width: 44px; height: 28px; display: grid; place-items: center; }
+.tab-ico { width: 100%; max-width: 44px; height: 28px; display: grid; place-items: center; }
 
 @media (min-width: 960px) {
   .app { display: grid; grid-template-columns: 252px minmax(0, 1fr); --topbar-h: 0px; }
@@ -463,7 +463,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 32px
 .badge.lvl-junior { background: var(--fill); color: var(--muted); }
 .avatar.lvl-capo { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent-border); }
 .avatar.lvl-senior { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px color-mix(in srgb, var(--lvl-senior) 45%, transparent); }
-@media (max-width: 380px) { .tab { font-size: 10px; } .tab-ico { width: 40px; } }
 
 /* ───── calendario Outlook ───── */
 .ics-help { margin-top: 12px; font-size: 14px; color: var(--muted); }
@@ -479,3 +478,54 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 32px
 .ics-row .tsub { display: block; color: var(--muted); font-size: 13.5px; }
 .ics-row select { width: 154px; min-height: 40px; padding: 6px 10px; }
 .ics-sum { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+
+/* ───── riunioni ───── */
+.cal-status { display: flex; align-items: center; gap: 10px; }
+.cal-status .mode-dot { width: 10px; height: 10px; flex: none; }
+.mt-fact { display: flex; align-items: flex-start; gap: 10px; }
+.mt-fact svg { flex: none; margin-top: 2px; color: var(--muted); }
+.mt-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 64px; width: 100%; padding: 10px 16px; border: 0; border-radius: 0; background: transparent; text-align: left; color: inherit; transition: background-color 0.2s ease; }
+.mt-row:hover { background-color: var(--card2); }
+.mt-time { display: grid; line-height: 1.25; }
+.mt-time b { font-weight: 650; letter-spacing: -0.014em; }
+.mt-time small { color: var(--muted); font-size: 13px; }
+.mt-body { display: grid; min-width: 0; }
+.mt-body b { font-weight: 600; letter-spacing: -0.014em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-body small { color: var(--muted); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-body small:empty { display: none; }
+.mt-side { display: inline-flex; align-items: center; gap: 8px; }
+.mt-join { color: var(--accent-text); }
+.mt-row.is-past { opacity: 0.55; }
+.mt-agenda { display: grid; gap: 4px; }
+.mt-dayhead { display: flex; align-items: center; gap: 10px; margin: 16px 2px 8px; }
+.mt-dayhead h2 { font-size: 18px; font-weight: 650; letter-spacing: -0.02em; }
+.mt-dayhead h2.is-today { color: var(--accent-text); }
+.mt-none { padding: 2px 2px 4px; font-size: 14px; }
+.mt-grid { display: none; }
+@media (min-width: 820px) {
+  .mt-agenda { display: none; }
+  .mt-grid { display: grid; column-gap: 0; padding: 14px 14px 18px 0; overflow: hidden; }
+}
+.mt-colhead { display: grid; justify-items: center; gap: 0; padding: 0 4px 8px; line-height: 1.15; }
+.mt-colhead small { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+.mt-colhead b { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
+.mt-colhead.is-today b { background: var(--accent); color: var(--on-accent); }
+.mt-gutter { position: relative; }
+.mt-gutter span { position: absolute; right: 8px; transform: translateY(-50%); font-size: 12px; color: var(--muted); }
+.mt-gutter span:first-child { transform: none; margin-top: -1px; }
+.mt-col { position: relative; border-left: 1px solid var(--hairline); background-image: linear-gradient(var(--hairline) 1px, transparent 1px); background-repeat: repeat-y; }
+.mt-col.is-today { background-color: color-mix(in srgb, var(--accent) 4%, transparent); }
+.mt-ev { position: absolute; display: grid; align-content: start; gap: 1px; padding: 5px 8px; overflow: hidden; border: 0; border-left: 3px solid var(--accent); border-radius: 8px; background: var(--accent-soft); color: var(--text); text-align: left; font-size: 12.5px; line-height: 1.25; transition: background-color 0.2s ease; }
+.mt-ev:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.mt-ev b { font-weight: 600; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-ev span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt-ev.is-past { opacity: 0.55; }
+.mt-ev.is-now { border-left-color: var(--ok); background: var(--ok-soft); }
+.mt-now { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid var(--danger); pointer-events: none; }
+.mt-now::before { content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); }
+@media (max-width: 430px) { .tab { font-size: 9.5px; letter-spacing: -0.012em; } }
+
+.hr { height: 1px; background: var(--hairline); margin: 2px 0 6px; }
+.mt-ev.is-short { display: flex; align-items: center; gap: 6px; padding-block: 2px; }
+.mt-ev.is-short b { flex: 0 1 auto; min-width: 2.5ch; }
+.mt-ev.is-short span { flex: 0 1000 auto; min-width: 0; font-size: 11.5px; }

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Auth, Backdrop } from './screens/Auth';
 import { Calendar } from './screens/Calendar';
 import { Dashboard } from './screens/Dashboard';
+import { Meetings } from './screens/Meetings';
 import { DayEditor } from './screens/DayEditor';
 import { PermitEditor } from './screens/PermitEditor';
 import { Pick } from './screens/Pick';
@@ -18,6 +19,7 @@ import { Avatar, BrandMark, Icon } from './ui';
 
 const ROUTES = [
   { id: 'oggi', label: 'Oggi', short: 'Oggi', icon: 'today' },
+  { id: 'riunioni', label: 'Riunioni', short: 'Riunioni', icon: 'video' },
   { id: 'calendario', label: 'Calendario', short: 'Calendario', icon: 'calendar' },
   { id: 'dashboard', label: 'Dashboard', short: 'Dashboard', icon: 'chart' },
   { id: 'permessi', label: 'Permessi', short: 'Permessi', icon: 'permit' },
@@ -50,6 +52,7 @@ function Shell() {
 
   let screen: ReactNode;
   switch (route) {
+    case 'riunioni': screen = <Meetings />; break;
     case 'calendario': screen = <Calendar />; break;
     case 'dashboard': screen = <Dashboard />; break;
     case 'permessi': screen = <Permits />; break;

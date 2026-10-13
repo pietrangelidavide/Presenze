@@ -2,7 +2,9 @@
 // All'apertura crea da sola un account di prova con i dati di esempio, così l'app si vede già piena.
 // Con ?accesso nell'indirizzo salta la preparazione e mostra la pagina di accesso.
 import { BOOK_KEY, MEMBERS_KEY, accountBook, type LocalAccount, type MemberSlot } from '../src/lib/accounts';
+import { CALENDAR_KEY, type CalendarState } from '../src/lib/calendar';
 import { demoData } from '../src/lib/demo';
+import type { IcsEvent } from '../src/lib/ics';
 import { ROSTER } from '../src/lib/team';
 import { addDays, mondayOf, weekday, ymd } from '../src/lib/time';
 import type { DayEntry, Mode } from '../src/lib/types';
@@ -82,6 +84,29 @@ function seedColleagues(today: string, mine: { userId: string }): void {
   localStorage.setItem(MEMBERS_KEY, JSON.stringify(slots));
 }
 
+// ── calendario di prova: qualche riunione fissa, qualcuna solo per oggi ──
+function demoCalendar(today: string): CalendarState {
+  const mon = mondayOf(today);
+  const ev = (uid: string, title: string, day: string, from: string, to: string, extra: Partial<IcsEvent> = {}): IcsEvent => ({
+    uid, title, start: day, end: day, allDay: false, rrule: null, exdates: [], recurrenceId: null, cancelled: false, oof: false,
+    startTime: `${from.replace(':', '')}00`, endDay: day, endTime: `${to.replace(':', '')}00`, durationMin: null, zone: 'Europe/Rome', location: null, join: null, ...extra,
+  });
+  const events: IcsEvent[] = [
+    ev('standup', 'Stand-up del team', addDays(mon, -14), '09:30', '09:45', { rrule: 'FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR', join: 'https://teams.microsoft.com/l/meetup-join/demo' }),
+    ev('planning', 'Pianificazione della settimana', addDays(mon, -14), '10:00', '11:30', { rrule: 'FREQ=WEEKLY;BYDAY=MO', location: 'Sala Roma' }),
+    ev('carlo', 'Punto con Carlo', addDays(mon, -13), '11:00', '11:30', { rrule: 'FREQ=WEEKLY;BYDAY=TU' }),
+    ev('review', 'Revisione dei progetti antifrode', addDays(mon, -12), '14:30', '16:00', { rrule: 'FREQ=WEEKLY;BYDAY=WE', location: 'Sala Milano' }),
+    ev('workshop', 'Workshop sicurezza', addDays(mon, 2), '11:30', '13:00', { join: 'https://teams.microsoft.com/l/meetup-join/demo2', location: 'Sala Roma' }),
+    ev('demo', 'Demo con il cliente', addDays(mon, 3), '15:00', '16:30', { join: 'https://teams.microsoft.com/l/meetup-join/demo3' }),
+    ev('retro', 'Retrospettiva', addDays(mon, 4), '16:00', '17:00'),
+    // sempre qualcosa per oggi, anche nel fine settimana
+    ev('oggi-1', 'Allineamento fornitori', today, '11:00', '11:45', { location: 'Sala Roma' }),
+    ev('oggi-2', 'Aggiornamento sul progetto', today, '15:00', '15:45', { join: 'https://teams.microsoft.com/l/meetup-join/demo4' }),
+    ev('oggi-3', 'Uno a uno con Carlo', today, '17:00', '17:30'),
+  ];
+  return { source: 'file', link: null, name: 'calendario-di-prova.ics', updatedAt: new Date().toISOString(), events };
+}
+
 async function prepare(): Promise<void> {
   ensureStorage();
   const book = accountBook();
@@ -92,6 +117,7 @@ async function prepare(): Promise<void> {
     const today = ymd(new Date());
     localStorage.setItem(book.dataKey(u.id), JSON.stringify(demoData(today)));
     seedColleagues(today, { userId: u.id });
+    localStorage.setItem(`${CALENDAR_KEY}.${u.id}`, JSON.stringify(demoCalendar(today)));
   } catch { /* senza archivio nel browser si parte vuoti: c'è il pulsante «Prova con dati di esempio» */ }
 }
 

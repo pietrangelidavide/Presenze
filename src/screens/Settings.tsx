@@ -2,13 +2,14 @@ import { useRef, useState } from 'react';
 import { download } from '../download';
 import { weeklyTarget } from '../lib/calc';
 import { demoData } from '../lib/demo';
-import { parseIcs, summarize, type IcsSummary } from '../lib/ics';
+import { summarize, type IcsSummary } from '../lib/ics';
 import { exportJson, parseImport } from '../lib/store';
 import { csvDays, csvPermits } from '../lib/stats';
 import { addDays, dur, durField, isYmd, parseDur, WEEKDAY_LONG } from '../lib/time';
 import type { Settings as SettingsT } from '../lib/types';
 import { onLinkClick } from '../route';
 import { useStore } from '../state';
+import { CalendarConnect } from './CalendarConnect';
 import { OutlookImport } from './OutlookImport';
 import { setThemePref, useThemePref, type ThemePref } from '../theme';
 import { Icon, Segmented, Toggle } from '../ui';
@@ -78,7 +79,6 @@ export function Settings() {
   const [theme] = useThemePref();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const file = useRef<HTMLInputElement>(null);
-  const icsFile = useRef<HTMLInputElement>(null);
   const [ics, setIcs] = useState<IcsSummary | null>(null);
 
   const update = (patch: Partial<SettingsT>) => void s.saveSettings({ ...st, ...patch });
@@ -95,16 +95,10 @@ export function Settings() {
     if (file.current) file.current.value = '';
   };
 
-  /** Calendario di Outlook (.ics): da un anno fa a un anno avanti. */
-  const onIcs = async (f: File | undefined) => {
-    if (!f) return;
-    try {
-      if (f.size > 15_000_000) throw new Error('Il file è troppo grande per essere un calendario.');
-      const events = parseIcs(await f.text());
-      if (!events.length) throw new Error('In questo calendario non ci sono eventi.');
-      setIcs(summarize(events, st, addDays(today, -365), addDays(today, 365)));
-    } catch (e) { s.toast(e instanceof Error ? e.message : 'File non valido', true); }
-    if (icsFile.current) icsFile.current.value = '';
+  /** Ferie, smart working e malattie dal calendario collegato: da un anno fa a un anno avanti. */
+  const openLeaveImport = () => {
+    if (!s.calendar.state) return;
+    setIcs(summarize(s.calendar.state.events, st, addDays(today, -365), addDays(today, 365)));
   };
 
   return (
@@ -167,16 +161,20 @@ export function Settings() {
 
       <section className="card" aria-label="Calendario Outlook">
         <div className="card-head"><div><h2>Calendario Outlook</h2>
-          <p className="card-sub">Porta in Presenze ferie, smart working e malattie segnati nel tuo calendario. Si legge un file, non serve nessun accesso a Outlook.</p></div></div>
-        <div className="row wrap">
-          <button type="button" className="btn sm" onClick={() => icsFile.current?.click()}><Icon name="calendar" size={16} /> Scegli il file .ics</button>
-          <input ref={icsFile} type="file" accept=".ics,text/calendar" hidden onChange={(e) => void onIcs(e.target.files?.[0])} />
-        </div>
+          <p className="card-sub">Mostra le riunioni di oggi e della settimana, e porta ferie, smart working e malattie nelle tue giornate. Si legge soltanto: Outlook non viene modificato.</p></div></div>
+        <CalendarConnect />
+        {s.calendar.state ? (
+          <div className="stack" style={{ gap: 8, marginTop: 14 }}>
+            <div className="hr" />
+            <div><b>Ferie, smart working e malattie</b><p className="muted" style={{ fontSize: 13.5 }}>Gli eventi di giornata intera del calendario possono diventare giornate di Presenze. Scegli tu cosa importare.</p></div>
+            <div className="row wrap"><button type="button" className="btn sm" onClick={openLeaveImport}><Icon name="calendar" size={16} /> Importa dal calendario</button></div>
+          </div>
+        ) : null}
         <details className="ics-help">
-          <summary>Come ottengo il file</summary>
+          <summary>Come ottengo il link o il file</summary>
           <ol>
-            <li><b>Outlook sul web</b>: Impostazioni → Calendario → Calendari condivisi → «Pubblica un calendario». Scegli il calendario, premi «Pubblica», copia il link ICS e aprilo nel browser: scarica il file.</li>
-            <li><b>Outlook per Windows</b> (versione classica): Calendario → File → Salva calendario.</li>
+            <li><b>Outlook sul web</b>: Impostazioni → Calendario → Calendari condivisi → «Pubblica un calendario». Scegli il calendario, premi «Pubblica» e copia il link ICS. Incollalo qui sopra: oppure aprilo nel browser per scaricare il file.</li>
+            <li><b>Outlook per Windows</b> (versione classica): Calendario → File → Salva calendario, per avere il file.</li>
             <li>I nomi dei menu cambiano un po’ da una versione all’altra. Se l’azienda non permette di pubblicare il calendario, chiedi il file a chi gestisce Outlook.</li>
           </ol>
         </details>

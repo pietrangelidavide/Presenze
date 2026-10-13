@@ -1,11 +1,12 @@
-// Calendario .ics (Outlook, Google, Apple…) → giornate di Presenze.
+// Calendario .ics (Outlook, Google, Apple…) → giornate e riunioni di Presenze.
 //
-// Si leggono gli eventi "di giornata intera" (ferie, smart working, malattia…): le riunioni con orario non servono.
-// Gli eventi che si ripetono (per esempio «Smart working» ogni mercoledì) vengono espansi nel periodo scelto.
+// Due usi: gli eventi "di giornata intera" (ferie, smart working, malattia…) diventano giornate; gli eventi con orario
+// sono le riunioni da mostrare in Oggi e nella pagina Riunioni (con i fusi orari, e il passaggio all'ora legale).
+// Gli eventi che si ripetono (per esempio «Smart working» ogni mercoledì) vengono espansi nel periodo richiesto.
 // Tutto qui è puro: niente rete, niente stato. L'esportazione di Outlook è letta così com'è (righe spezzate,
 // fusi orari tra virgolette, VTIMEZONE, allarmi…), senza chiedere nulla a Microsoft.
 import { holidayName } from './holidays';
-import { addDays, diffDays, mondayOf, parseYmd, weekday, ymd } from './time';
+import { addDays, clock, diffDays, mondayOf, parseYmd, weekday, ymd } from './time';
 import { MODE_LABEL, type DayEntry, type Mode, type Settings } from './types';
 
 export interface IcsEvent {
@@ -25,6 +26,19 @@ export interface IcsEvent {
   cancelled: boolean;
   /** Segnato "Fuori sede" in Outlook. */
   oof: boolean;
+  // ── solo per gli eventi con orario (le riunioni) ──
+  /** Ora di inizio, 'HHMMSS', nel fuso dell'evento. */
+  startTime: string | null;
+  /** Giorno e ora di fine, nel fuso dell'evento (null se manca: vale la durata, o zero). */
+  endDay: string | null;
+  endTime: string | null;
+  /** Durata in minuti, se il file la dà al posto della fine. */
+  durationMin: number | null;
+  /** Fuso orario dell'evento (nome IANA, per esempio 'Europe/Rome'); null = ora locale di chi guarda. */
+  zone: string | null;
+  location: string | null;
+  /** Indirizzo per partecipare online (Teams, Zoom, Meet), se c'è. */
+  join: string | null;
 }
 
 // ───────────────────────── lettura del file ─────────────────────────
@@ -79,12 +93,51 @@ function parseDt(value: string): Dt | null {
   return { day, time: m[4] ? `${m[4]}${m[5]}${m[6] ?? '00'}` : null, utc: !!m[7] };
 }
 
-/** «P1D», «P2W», «PT24H» → giorni (solo multipli di giorno: basta per le giornate intere). */
-function durationDays(v: string): number | null {
-  const m = v.trim().match(/^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?)?$/);
+/** «P1D», «P2W», «PT1H30M» → minuti. */
+function durationMinutes(v: string): number | null {
+  const m = v.trim().match(/^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/);
   if (!m) return null;
-  const days = Number(m[1] ?? 0) * 7 + Number(m[2] ?? 0) + (m[3] ? Math.floor(Number(m[3]) / 24) : 0);
-  return days > 0 ? days : null;
+  const min = Number(m[1] ?? 0) * 10080 + Number(m[2] ?? 0) * 1440 + Number(m[3] ?? 0) * 60 + Number(m[4] ?? 0) + Math.floor(Number(m[5] ?? 0) / 60);
+  return min > 0 ? min : null;
+}
+
+// ───────────────────────── fusi orari e indirizzi delle riunioni ─────────────────────────
+/** Nomi di fuso orario di Windows (quelli di Outlook) → nome IANA. Gli altri si riconoscono da come si chiamano. */
+const WINDOWS_ZONES: Record<string, string> = {
+  'w. europe standard time': 'Europe/Rome', 'romance standard time': 'Europe/Paris', 'central europe standard time': 'Europe/Budapest',
+  'central european standard time': 'Europe/Warsaw', 'gmt standard time': 'Europe/London', 'greenwich standard time': 'Atlantic/Reykjavik',
+  'e. europe standard time': 'Europe/Chisinau', 'fle standard time': 'Europe/Kiev', 'gtb standard time': 'Europe/Bucharest',
+  'russian standard time': 'Europe/Moscow', 'turkey standard time': 'Europe/Istanbul', 'utc': 'UTC', 'coordinated universal time': 'UTC',
+  'eastern standard time': 'America/New_York', 'central standard time': 'America/Chicago', 'mountain standard time': 'America/Denver',
+  'pacific standard time': 'America/Los_Angeles', 'india standard time': 'Asia/Kolkata', 'china standard time': 'Asia/Shanghai',
+  'tokyo standard time': 'Asia/Tokyo', 'aus eastern standard time': 'Australia/Sydney',
+};
+
+const validZone = (z: string): boolean => { try { new Intl.DateTimeFormat('en-US', { timeZone: z }); return true; } catch { return false; } };
+
+/** Il nome del fuso come lo scrive il file → nome IANA, oppure null se non si capisce (si userà l'ora locale). */
+function zoneName(tzid: string): string | null {
+  const t = tzid.trim();
+  const win = WINDOWS_ZONES[t.toLowerCase()];
+  if (win) return win;
+  if (/^[A-Za-z_]+(\/[A-Za-z0-9_+-]+)+$/.test(t) && validZone(t)) return t;
+  // «(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna» e simili: Outlook a volte scrive così
+  if (/\b(Rome|Roma|Berlin|Amsterdam|Vienna|Stockholm|Bern|Zurich|Oslo)\b/i.test(t)) return 'Europe/Rome';
+  if (/\b(Paris|Brussels|Copenhagen|Madrid)\b/i.test(t)) return 'Europe/Paris';
+  if (/\b(London|Dublin|Lisbon|Edinburgh)\b/i.test(t)) return 'Europe/London';
+  return null;
+}
+
+const joinHost = /^https:\/\/([a-z0-9-]+\.)*(teams\.microsoft\.com|teams\.live\.com|zoom\.us|meet\.google\.com|webex\.com|whereby\.com)(\/|$)/i;
+
+/** Il primo indirizzo per partecipare online trovato tra i campi dell'evento (solo https e solo servizi di riunione noti). */
+function joinLink(...fields: string[]): string | null {
+  for (const f of fields) {
+    for (const m of f.replace(/\\n/gi, ' ').replace(/\\([,;])/g, '$1').matchAll(/https:\/\/[^\s<>"'\\)\]]+/gi)) {
+      if (joinHost.test(m[0])) return m[0].slice(0, 500);
+    }
+  }
+  return null;
 }
 
 function buildEvent(props: Prop[]): IcsEvent | null {
@@ -95,7 +148,8 @@ function buildEvent(props: Prop[]): IcsEvent | null {
 
   const endP = first('DTEND');
   const de = endP ? parseDt(endP.value) : null;
-  const dur = first('DURATION') ? durationDays(first('DURATION')!.value) : null;
+  const durMin = first('DURATION') ? durationMinutes(first('DURATION')!.value) : null;
+  const dur = durMin === null ? null : Math.max(1, Math.round(durMin / 1440));
 
   const flagged = first('X-MICROSOFT-CDO-ALLDAYEVENT')?.value.trim().toUpperCase() === 'TRUE';
   // Outlook salva a volte la giornata intera come «dalle 00:00 alle 00:00 del giorno dopo» (ora locale).
@@ -120,6 +174,12 @@ function buildEvent(props: Prop[]): IcsEvent | null {
   }
   const oof = ['X-MICROSOFT-CDO-BUSYSTATUS', 'X-MICROSOFT-CDO-INTENDEDSTATUS'].some((n) => first(n)?.value.trim().toUpperCase() === 'OOF');
 
+  // le riunioni: orario, fuso, luogo e indirizzo per partecipare
+  const timed = !allDay && ds.time !== null;
+  const tz = startP?.params.TZID;
+  const zone = !timed ? null : ds.utc ? 'UTC' : tz ? zoneName(tz) : null;
+  const description = first('DESCRIPTION')?.value ?? '';
+
   return {
     uid: first('UID')?.value.trim() || `${ds.day}-${props.length}`,
     title: unescapeText(first('SUMMARY')?.value ?? ''),
@@ -129,6 +189,13 @@ function buildEvent(props: Prop[]): IcsEvent | null {
     recurrenceId: rid?.day ?? null,
     cancelled: first('STATUS')?.value.trim().toUpperCase() === 'CANCELLED',
     oof,
+    startTime: timed ? ds.time : null,
+    endDay: timed && de ? de.day : null,
+    endTime: timed && de ? de.time : null,
+    durationMin: timed && !de ? durMin : null,
+    zone,
+    location: timed ? unescapeText(first('LOCATION')?.value ?? '').slice(0, 160) || null : null,
+    join: timed ? joinLink(first('X-MICROSOFT-SKYPETEAMSMEETINGURL')?.value ?? '', first('X-MICROSOFT-ONLINEMEETINGEXTERNALLINK')?.value ?? '', first('URL')?.value ?? '', description, first('LOCATION')?.value ?? '') : null,
   };
 }
 
@@ -262,6 +329,93 @@ export function expandEvents(events: IcsEvent[], from: string, to: string): Occu
     }
   }
   return out;
+}
+
+// ───────────────────────── riunioni ─────────────────────────
+const dtfCache = new Map<string, Intl.DateTimeFormat>();
+/** Di quanti millisecondi l'ora del fuso `zone` è avanti rispetto a UTC, in quell'istante. */
+function zoneOffset(zone: string, ms: number): number {
+  let f = dtfCache.get(zone);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    dtfCache.set(zone, f);
+  }
+  const parts = f.formatToParts(new Date(ms));
+  const part = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  return Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second')) - Math.floor(ms / 1000) * 1000;
+}
+
+/** L'istante (in millisecondi) in cui l'orologio del fuso `zone` segna `day` `hhmmss`. Senza fuso vale l'ora locale. */
+export function wallToInstant(day: string, hhmmss: string, zone: string | null): number {
+  const [y, mo, d] = day.split('-').map(Number);
+  const h = Number(hhmmss.slice(0, 2)), mi = Number(hhmmss.slice(2, 4)), se = Number(hhmmss.slice(4, 6) || 0);
+  if (!zone) return new Date(y, mo - 1, d, h, mi, se).getTime();
+  const guess = Date.UTC(y, mo - 1, d, h, mi, se);
+  try {
+    const first = guess - zoneOffset(zone, guess);
+    const off = zoneOffset(zone, first);
+    return guess - off;                                   // corretto anche a cavallo del cambio dell'ora
+  } catch {
+    return new Date(y, mo - 1, d, h, mi, se).getTime();   // fuso sconosciuto: ora locale
+  }
+}
+
+/** Una riunione, con giorno e orari già nel fuso di chi guarda. */
+export interface Meeting {
+  id: string;
+  title: string;
+  /** Giorno ('YYYY-MM-DD') in cui comincia. */
+  day: string;
+  /** 'HH:MM' */
+  start: string;
+  end: string;
+  /** Minuti dalla mezzanotte; la fine è tagliata alla mezzanotte se la riunione va oltre. */
+  startMin: number;
+  endMin: number;
+  location: string | null;
+  join: string | null;
+}
+
+/** Le riunioni (eventi con orario) che cominciano tra `from` e `to` (giorni inclusi, ora locale), in ordine di inizio. */
+export function meetingsBetween(events: IcsEvent[], from: string, to: string): Meeting[] {
+  const out = new Map<string, Meeting>();
+  const wfrom = addDays(from, -2), wto = addDays(to, 2);       // il fuso dell'evento può spostare il giorno
+  const moved = new Set(events.filter((e) => e.recurrenceId).map((e) => `${e.uid}|${e.recurrenceId}`));
+
+  for (const ev of events) {
+    if (ev.allDay || ev.cancelled || !ev.startTime) continue;
+    const first = wallToInstant(ev.start, ev.startTime, ev.zone);
+    const length = ev.endDay && ev.endTime ? Math.max(0, wallToInstant(ev.endDay, ev.endTime, ev.zone) - first) : (ev.durationMin ?? 0) * 60000;
+
+    let starts: string[];
+    if (!ev.rrule || ev.recurrenceId) starts = [ev.start];
+    else {
+      const skip = new Set(ev.exdates);
+      starts = ruleStarts(ev.start, parseRule(ev.rrule), wto).filter((s) => s >= wfrom && !skip.has(s) && !moved.has(`${ev.uid}|${s}`));
+    }
+
+    for (const s of starts) {
+      if (s < wfrom || s > wto) continue;
+      const a = new Date(wallToInstant(s, ev.startTime, ev.zone));
+      const b = new Date(a.getTime() + length);
+      const day = ymd(a);
+      if (day < from || day > to) continue;
+      const startMin = a.getHours() * 60 + a.getMinutes();
+      const endMin = ymd(b) > day ? 24 * 60 : b.getHours() * 60 + b.getMinutes();
+      const id = `${ev.uid}|${day}|${startMin}`;
+      if (out.has(id)) continue;
+      out.set(id, { id, title: ev.title || 'Riunione', day, start: clock(startMin), end: clock(ymd(b) > day ? b.getHours() * 60 + b.getMinutes() : endMin), startMin, endMin, location: ev.location, join: ev.join });
+    }
+  }
+  return [...out.values()].sort((x, y) => x.day.localeCompare(y.day) || x.startMin - y.startMin || x.endMin - y.endMin || x.title.localeCompare(y.title));
+}
+
+/** Dov'è una riunione rispetto a ora (solo per i giorni di oggi): finita, in corso, o ancora da fare. */
+export type Phase = 'past' | 'now' | 'later';
+export function meetingPhase(m: Pick<Meeting, 'startMin' | 'endMin'>, nowMin: number, isToday: boolean): Phase {
+  if (!isToday) return 'later';
+  if (m.endMin > m.startMin ? m.endMin <= nowMin : m.startMin < nowMin) return 'past';
+  return m.startMin <= nowMin ? 'now' : 'later';
 }
 
 // ───────────────────────── dagli eventi alle giornate ─────────────────────────
