@@ -13,7 +13,7 @@ import { hasSupabase } from './lib/supabase';
 import { onLinkClick, useRoute } from './route';
 import { AppProvider, useStore } from './state';
 import { useThemePref, type ThemePref } from './theme';
-import { Avatar, Icon } from './ui';
+import { Avatar, BrandMark, Icon } from './ui';
 
 const ROUTES = [
   { id: 'oggi', label: 'Oggi', short: 'Oggi', icon: 'today' },
@@ -60,14 +60,14 @@ function Shell() {
   return (
     <div className="app">
       <header className="topbar">
-        <a href="#/oggi" onClick={onLinkClick('oggi')} className="topbar-brand"><span className="brand-mark"><Icon name="clock" size={18} /></span>Presenze</a>
+        <a href="#/oggi" onClick={onLinkClick('oggi')} className="topbar-brand"><BrandMark size={28} />Presenze</a>
         <a href="#/profilo" onClick={onLinkClick('profilo')} className="topbar-me" aria-label={`Il tuo profilo${s.name ? `: ${s.name}` : ''}`} aria-current={route === 'profilo' ? 'page' : undefined}>
           <Avatar src={s.avatar} name={s.name} email={s.email} size={38} />
         </a>
       </header>
 
       <nav className="rail" aria-label="Navigazione principale">
-        <div className="brand"><span className="brand-mark"><Icon name="clock" size={20} /></span><span>Presenze<small>Le tue ore di lavoro</small></span></div>
+        <div className="brand"><BrandMark size={34} /><span>Presenze<small>Le tue ore di lavoro</small></span></div>
         <a href="#/profilo" onClick={onLinkClick('profilo')} className="rail-me" aria-current={route === 'profilo' ? 'page' : undefined}>
           <Avatar src={s.avatar} name={s.name} email={s.email} size={46} />
           <span className="rail-me-text"><b>{s.name || s.email}</b><small>Il tuo profilo</small></span>

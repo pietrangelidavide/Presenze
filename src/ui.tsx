@@ -130,6 +130,32 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
   );
 }
 
+/** Il marchio di Presenze: lo stesso disegno dell'icona dell'app (public/icon.svg), così interfaccia e schermata Home restano d'accordo. */
+export function BrandMark({ size = 30, className = '' }: { size?: number; className?: string }) {
+  return (
+    <svg className={`brand-mark ${className}`} width={size} height={size} viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+      <rect width="512" height="512" rx="112" fill="#F1E54C" />
+      <circle cx="256" cy="256" r="150" fill="none" stroke="#27305C" strokeWidth="30" />
+      <path d="M256 166v94l64 40" fill="none" stroke="#27305C" strokeWidth="30" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Anello di avanzamento: da 0 a 1 (oltre 1 resta pieno). Il colore è quello del testo (`color`) e può essere cambiato dal CSS con `.ring.ok`. */
+export function Ring({ value, label, tone, children }: { value: number; label: string; tone?: 'ok' | 'smart'; children?: ReactNode }) {
+  const v = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+  const R = 44, C = 2 * Math.PI * R;
+  return (
+    <div className={`ring ${tone ?? ''}`} role="img" aria-label={label}>
+      <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+        <circle className="ring-track" cx="50" cy="50" r={R} fill="none" strokeWidth="11" />
+        <circle className="ring-arc" cx="50" cy="50" r={R} fill="none" strokeWidth="11" strokeLinecap="round" strokeDasharray={`${(C * v).toFixed(2)} ${C.toFixed(2)}`} transform="rotate(-90 50 50)" style={{ opacity: v > 0 ? 1 : 0 }} />
+      </svg>
+      <div className="ring-in" aria-hidden="true">{children}</div>
+    </div>
+  );
+}
+
 /** Foto del profilo, rotonda. Senza foto mostra le iniziali. Da sola è decorativa: il nome va scritto accanto o nell'etichetta del pulsante. */
 export function Avatar({ src, name, email, size = 40, className = '' }: { src: string | null | undefined; name?: string | null; email?: string | null; size?: number; className?: string }) {
   return (

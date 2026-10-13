@@ -5,7 +5,7 @@ import { STATUS_LABEL, toFix } from '../lib/stats';
 import { addDays, clock, dayLong, dayShort, dur, durSigned, isoWeek, nowHm, WEEKDAY_SHORT, dayMonth } from '../lib/time';
 import { MODE_LABEL, type DayEntry, type Mode } from '../lib/types';
 import { useStore } from '../state';
-import { Icon, ModeDot, Segmented } from '../ui';
+import { Icon, ModeDot, Ring, Segmented } from '../ui';
 
 const SHORT: Record<string, string> = { office: 'Sede', smart: 'Smart', vacation: 'Ferie', sick: 'Malattia', holiday: 'Festa' };
 
@@ -104,12 +104,14 @@ function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onEnd
   const sched = ctx.settings.schedule[String(info.wd)];
   const exit = expectedExit(info, ctx);
   const hasWork = info.target > 0 && !info.holiday;
+  const pct = info.expected > 0 ? info.worked / info.expected : 0;
+  const pctText = `${Math.round(Math.min(pct, 9.99) * 100)}%`;
 
   // Giornata libera segnata (ferie, malattia, festività a mano)
   if (info.status === 'vacation' || info.status === 'sick' || (info.entry?.mode === 'holiday')) {
     const m = info.entry?.mode as Mode;
     return (
-      <section className="card glass hero" aria-label="Oggi">
+      <section className="card hero" aria-label="Oggi">
         <div className="hero-top"><div><div className="hero-label">Oggi</div><div className="hero-big" style={{ fontSize: 40 }}>{MODE_LABEL[m]}</div></div><span className="badge"><ModeDot mode={m} /> Nessuna ora da fare</span></div>
         <p className="hero-meta">La giornata non conta nel saldo delle ore.</p>
         <div className="hero-actions"><button type="button" className="btn" onClick={() => s.openDay(today)}>Cambia</button></div>
@@ -120,10 +122,14 @@ function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onEnd
   if (info.status === 'open' && info.inMin !== null) {
     const remaining = Math.max(0, info.expected - info.worked);
     return (
-      <section className="card glass hero" aria-label="Giornata in corso">
+      <section className="card hero" aria-label="Giornata in corso">
         <div className="hero-top">
-          <div><div className="hero-label">Ore nette finora</div><div className="hero-big num">{dur(info.worked)}</div></div>
-          <span className="badge"><ModeDot mode={info.entry?.mode ?? 'office'} /> {MODE_LABEL[info.entry?.mode ?? 'office']}</span>
+          <div className="hero-main">
+            <div className="hero-label">Ore nette finora</div>
+            <div className="hero-big num">{dur(info.worked)}</div>
+            <span className="badge"><ModeDot mode={info.entry?.mode ?? 'office'} /> {MODE_LABEL[info.entry?.mode ?? 'office']}</span>
+          </div>
+          <Ring value={pct} tone={pct >= 1 ? 'ok' : undefined} label={`${pctText} delle ore previste di oggi`}><b className="num">{pctText}</b><small>previste</small></Ring>
         </div>
         <div className="hero-meta">
           <span>Entrata <b className="num">{info.entry?.clockIn}</b></span>
@@ -142,10 +148,14 @@ function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onEnd
 
   if (info.status === 'done' && info.auto) {
     return (
-      <section className="card glass hero" aria-label="Smart working in automatico">
+      <section className="card hero" aria-label="Smart working in automatico">
         <div className="hero-top">
-          <div><div className="hero-label">Smart working</div><div className="hero-big num">{dur(info.worked)}</div></div>
-          <span className="badge"><ModeDot mode="smart" /> Ore previste</span>
+          <div className="hero-main">
+            <div className="hero-label">Smart working</div>
+            <div className="hero-big num">{dur(info.worked)}</div>
+            <span className="badge"><ModeDot mode="smart" /> Ore previste</span>
+          </div>
+          <Ring value={1} tone="smart" label="Ore previste contate in automatico"><Icon name="smart" size={30} /></Ring>
         </div>
         <div className="hero-meta">
           <span>Senza timbratura contiamo in automatico le ore previste di oggi.</span>
@@ -162,10 +172,16 @@ function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onEnd
 
   if (info.status === 'done') {
     return (
-      <section className="card glass hero" aria-label="Giornata chiusa">
+      <section className="card hero" aria-label="Giornata chiusa">
         <div className="hero-top">
-          <div><div className="hero-label">Giornata chiusa</div><div className="hero-big num">{dur(info.worked)}</div></div>
-          <span className="badge"><ModeDot mode={info.entry?.mode ?? 'office'} /> {MODE_LABEL[info.entry?.mode ?? 'office']}</span>
+          <div className="hero-main">
+            <div className="hero-label">Giornata chiusa</div>
+            <div className="hero-big num">{dur(info.worked)}</div>
+            <span className="badge"><ModeDot mode={info.entry?.mode ?? 'office'} /> {MODE_LABEL[info.entry?.mode ?? 'office']}</span>
+          </div>
+          <Ring value={pct} tone={pct >= 1 ? 'ok' : undefined} label={`${pctText} delle ore previste di oggi`}>
+            {pct >= 1 ? <Icon name="check" size={34} /> : <><b className="num">{pctText}</b><small>previste</small></>}
+          </Ring>
         </div>
         <div className="hero-meta">
           <span><b className="num">{info.entry?.clockIn}</b> → <b className="num">{info.entry?.clockOut}</b></span>
@@ -185,13 +201,15 @@ function Hero({ info, mode, setMode, overLimit, smartUsed, limit, onStart, onEnd
   const reason = info.holiday ? `Oggi è festa: ${info.holiday}.` : !hasWork ? 'Oggi non è previsto lavoro.' : null;
   const ifNow = hasWork ? nowMin + info.expected + (sched?.breakMin ?? 0) : null;
   return (
-    <section className="card glass hero" aria-label="Inizia la giornata">
+    <section className="card hero" aria-label="Inizia la giornata">
       <div className="hero-top">
-        <div>
+        <div className="hero-main">
           <div className="hero-label">{reason ?? 'Ora'}</div>
           <div className="hero-big num">{clock(nowMin)}</div>
         </div>
-        {hasWork ? <span className="badge plain">Previste {dur(info.expected)}</span> : null}
+        <Ring value={0} label={hasWork ? `Ore previste oggi: ${dur(info.expected)}` : 'Nessuna ora prevista oggi'}>
+          {hasWork ? <><b className="num">{dur(info.expected)}</b><small>previste</small></> : <Icon name="clock" size={30} />}
+        </Ring>
       </div>
       {hasWork ? (
         <div className="hero-meta">

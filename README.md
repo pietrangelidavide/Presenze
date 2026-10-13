@@ -41,6 +41,12 @@ Orario di partenza: **36 ore nette a settimana**.
 - La **banca ore** è il saldo di partenza più la somma dei saldi di tutte le giornate concluse. Le giornate passate senza orari contano come ore mancanti finché non vengono completate (compaiono in "Da sistemare").
 - Il limite di smart working è controllato dall'app (avviso), non dal database.
 
+## Stile Apple (ramo `stile-apple`)
+
+Sul ramo `stile-apple` l'interfaccia ha un aspetto ispirato ad Apple: superfici piatte e arrotondate, titoli grandi, barre traslucide, liste raggruppate, interruttori e segmenti come su iOS, blu di sistema come unico colore d'azione, tema chiaro e scuro. Nella schermata *Oggi* le ore della giornata sono un anello di avanzamento. Funzioni, calcoli e dati sono gli stessi del ramo `main`: cambiano solo `src/tokens.css`, `src/styles.css` e qualche componente (`src/ui.tsx`, `src/App.tsx`, `src/screens/Today.tsx`, `src/screens/Auth.tsx`). Le icone dell'app non sono cambiate. Per adottarlo basta unire il ramo in `main`.
+
+`npm run preview:build` compila l'app in una pagina sola (`dist/anteprima.html`, con un account di prova e dati di esempio già pronti), senza bisogno di Vite: utile per provarla al volo o per mostrarla.
+
 ## Provarla sul tuo computer (Windows, `cmd`)
 
 Serve [Node.js](https://nodejs.org) 20 o più recente.

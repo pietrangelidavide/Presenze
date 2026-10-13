@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test.mjs",
+    "preview:build": "node scripts/preview.mjs",
     "ios:prepare": "bash scripts/ios-prepare.sh"
   },
   "dependencies": {
