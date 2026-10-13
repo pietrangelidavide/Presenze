@@ -464,3 +464,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 32px
 .avatar.lvl-capo { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent-border); }
 .avatar.lvl-senior { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px color-mix(in srgb, var(--lvl-senior) 45%, transparent); }
 @media (max-width: 380px) { .tab { font-size: 10px; } .tab-ico { width: 40px; } }
+
+/* ───── calendario Outlook ───── */
+.ics-help { margin-top: 12px; font-size: 14px; color: var(--muted); }
+.ics-help summary, .ics-more summary { cursor: pointer; font-weight: 600; color: var(--accent-text); padding: 6px 0; list-style: none; }
+.ics-help summary::-webkit-details-marker, .ics-more summary::-webkit-details-marker { display: none; }
+.ics-help summary::before, .ics-more summary::before { content: "›"; display: inline-block; width: 14px; transition: transform 0.2s ease; }
+.ics-help[open] summary::before, .ics-more[open] summary::before { transform: rotate(90deg); }
+.ics-help ol { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 8px; }
+.ics-help b { color: var(--text); }
+.ics-more .plist { margin-top: 6px; }
+.ics-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 64px; padding: 10px 16px; }
+.ics-row .tname { display: block; font-weight: 600; letter-spacing: -0.014em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ics-row .tsub { display: block; color: var(--muted); font-size: 13.5px; }
+.ics-row select { width: 154px; min-height: 40px; padding: 6px 10px; }
+.ics-sum { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }

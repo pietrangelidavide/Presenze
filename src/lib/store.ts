@@ -9,6 +9,8 @@ export interface Repo {
   load(): Promise<Data>;
   saveSettings(s: Settings): Promise<void>;
   saveDay(e: DayEntry): Promise<void>;
+  /** Salva più giornate in una volta (importazione dal calendario). */
+  saveDays(list: DayEntry[]): Promise<void>;
   deleteDay(day: string): Promise<void>;
   addPermit(p: Omit<Permit, 'id'>): Promise<Permit>;
   updatePermit(p: Permit): Promise<void>;
@@ -145,6 +147,12 @@ export class LocalRepo implements Repo {
     d.days = [...d.days.filter((x) => x.day !== e.day), e].sort((a, b) => a.day.localeCompare(b.day));
     this.write();
   }
+  async saveDays(list: DayEntry[]) {
+    const d = this.read();
+    const incoming = new Set(list.map((e) => e.day));
+    d.days = [...d.days.filter((x) => !incoming.has(x.day)), ...list].sort((a, b) => a.day.localeCompare(b.day));
+    this.write();
+  }
   async deleteDay(day: string) { const d = this.read(); d.days = d.days.filter((x) => x.day !== day); this.write(); }
   async addPermit(p: Omit<Permit, 'id'>) {
     const d = this.read();
@@ -219,6 +227,9 @@ export class CloudRepo implements Repo {
 
   async saveSettings(s: Settings) { this.check((await this.db.from('presenze_settings').upsert(this.settingsRow(s), { onConflict: 'user_id' })).error); }
   async saveDay(e: DayEntry) { this.check((await this.db.from('presenze_days').upsert(this.dayRow(e), { onConflict: 'user_id,day' })).error); }
+  async saveDays(list: DayEntry[]) {
+    for (let i = 0; i < list.length; i += 500) this.check((await this.db.from('presenze_days').upsert(list.slice(i, i + 500).map((e) => this.dayRow(e)), { onConflict: 'user_id,day' })).error);
+  }
   async deleteDay(day: string) { this.check((await this.db.from('presenze_days').delete().eq('day', day)).error); }
   async addPermit(p: Omit<Permit, 'id'>) {
     const full: Permit = { ...p, id: newId() };

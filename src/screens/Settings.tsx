@@ -2,12 +2,14 @@ import { useRef, useState } from 'react';
 import { download } from '../download';
 import { weeklyTarget } from '../lib/calc';
 import { demoData } from '../lib/demo';
+import { parseIcs, summarize, type IcsSummary } from '../lib/ics';
 import { exportJson, parseImport } from '../lib/store';
 import { csvDays, csvPermits } from '../lib/stats';
-import { dur, durField, isYmd, parseDur, WEEKDAY_LONG } from '../lib/time';
+import { addDays, dur, durField, isYmd, parseDur, WEEKDAY_LONG } from '../lib/time';
 import type { Settings as SettingsT } from '../lib/types';
 import { onLinkClick } from '../route';
 import { useStore } from '../state';
+import { OutlookImport } from './OutlookImport';
 import { setThemePref, useThemePref, type ThemePref } from '../theme';
 import { Icon, Segmented, Toggle } from '../ui';
 
@@ -76,6 +78,8 @@ export function Settings() {
   const [theme] = useThemePref();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const file = useRef<HTMLInputElement>(null);
+  const icsFile = useRef<HTMLInputElement>(null);
+  const [ics, setIcs] = useState<IcsSummary | null>(null);
 
   const update = (patch: Partial<SettingsT>) => void s.saveSettings({ ...st, ...patch });
   const setDay = (wd: number, patch: Partial<{ netMin: number; breakMin: number }>) =>
@@ -89,6 +93,18 @@ export function Settings() {
     try { setConfirm({ import: parseImport(await f.text(), today) }); }
     catch (e) { s.toast(e instanceof Error ? e.message : 'File non valido', true); }
     if (file.current) file.current.value = '';
+  };
+
+  /** Calendario di Outlook (.ics): da un anno fa a un anno avanti. */
+  const onIcs = async (f: File | undefined) => {
+    if (!f) return;
+    try {
+      if (f.size > 15_000_000) throw new Error('Il file è troppo grande per essere un calendario.');
+      const events = parseIcs(await f.text());
+      if (!events.length) throw new Error('In questo calendario non ci sono eventi.');
+      setIcs(summarize(events, st, addDays(today, -365), addDays(today, 365)));
+    } catch (e) { s.toast(e instanceof Error ? e.message : 'File non valido', true); }
+    if (icsFile.current) icsFile.current.value = '';
   };
 
   return (
@@ -149,6 +165,23 @@ export function Settings() {
         ]} />
       </section>
 
+      <section className="card" aria-label="Calendario Outlook">
+        <div className="card-head"><div><h2>Calendario Outlook</h2>
+          <p className="card-sub">Porta in Presenze ferie, smart working e malattie segnati nel tuo calendario. Si legge un file, non serve nessun accesso a Outlook.</p></div></div>
+        <div className="row wrap">
+          <button type="button" className="btn sm" onClick={() => icsFile.current?.click()}><Icon name="calendar" size={16} /> Scegli il file .ics</button>
+          <input ref={icsFile} type="file" accept=".ics,text/calendar" hidden onChange={(e) => void onIcs(e.target.files?.[0])} />
+        </div>
+        <details className="ics-help">
+          <summary>Come ottengo il file</summary>
+          <ol>
+            <li><b>Outlook sul web</b>: Impostazioni → Calendario → Calendari condivisi → «Pubblica un calendario». Scegli il calendario, premi «Pubblica», copia il link ICS e aprilo nel browser: scarica il file.</li>
+            <li><b>Outlook per Windows</b> (versione classica): Calendario → File → Salva calendario.</li>
+            <li>I nomi dei menu cambiano un po’ da una versione all’altra. Se l’azienda non permette di pubblicare il calendario, chiedi il file a chi gestisce Outlook.</li>
+          </ol>
+        </details>
+      </section>
+
       <section className="card" aria-label="Dati">
         <div className="card-head"><div><h2>I tuoi dati</h2>
           <p className="card-sub">{s.kind === 'local' ? 'Sono salvati solo in questo browser. Fai ogni tanto una copia di sicurezza.' : 'Sono salvati nel tuo account e li ritrovi su ogni dispositivo.'}</p></div></div>
@@ -185,6 +218,8 @@ export function Settings() {
           {s.kind === 'local' ? <p className="muted">Questo account vive solo in questo browser: i dati non si sincronizzano con altri dispositivi. Per usare lo stesso account su telefono e computer collega Supabase (guida nel file README).</p> : null}
         </div>
       </section>
+
+      {ics ? <OutlookImport summary={ics} onClose={() => setIcs(null)} /> : null}
     </div>
   );
 }

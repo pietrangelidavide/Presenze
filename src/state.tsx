@@ -44,6 +44,7 @@ export interface Store {
   toasts: ToastMsg[];
   toast: (text: string, bad?: boolean) => void;
   saveDay: (e: DayEntry) => Promise<boolean>;
+  saveDays: (list: DayEntry[]) => Promise<boolean>;
   deleteDay: (day: string) => Promise<boolean>;
   addPermit: (p: Omit<Permit, 'id'>) => Promise<boolean>;
   updatePermit: (p: Permit) => Promise<boolean>;
@@ -224,6 +225,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (d) => ({ ...d, days: [...d.days.filter((x) => x.day !== e.day), e].sort((a, b) => a.day.localeCompare(b.day)) }),
     (r) => r.saveDay(e),
   ), [commit]);
+  const saveDays = useCallback((list: DayEntry[]) => commit(
+    (d) => {
+      const incoming = new Set(list.map((e) => e.day));
+      return { ...d, days: [...d.days.filter((x) => !incoming.has(x.day)), ...list].sort((a, b) => a.day.localeCompare(b.day)) };
+    },
+    (r) => r.saveDays(list),
+  ), [commit]);
   const deleteDay = useCallback((day: string) => commit((d) => ({ ...d, days: d.days.filter((x) => x.day !== day) }), (r) => r.deleteDay(day)), [commit]);
   const updatePermit = useCallback((p: Permit) => commit((d) => ({ ...d, permits: d.permits.map((x) => (x.id === p.id ? p : x)) }), (r) => r.updatePermit(p)), [commit]);
   const deletePermit = useCallback((id: string) => commit((d) => ({ ...d, permits: d.permits.filter((x) => x.id !== id) }), (r) => r.deletePermit(id)), [commit]);
@@ -317,7 +325,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value: Store = {
     boot, error, kind: supabase ? 'cloud' : 'local', email, name, avatar, data, ctx, tl, now, today, nowMin, toasts, toast,
-    saveDay, deleteDay, addPermit, updatePermit, deletePermit, team, claimMember, releaseMember, setShared, teamDays, refreshTeam, saveSettings, replaceAll, clearAll, saveProfile, signOut, reload,
+    saveDay, saveDays, deleteDay, addPermit, updatePermit, deletePermit, team, claimMember, releaseMember, setShared, teamDays, refreshTeam, saveSettings, replaceAll, clearAll, saveProfile, signOut, reload,
     dayEditor, openDay, permitEditor, openPermit,
   };
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

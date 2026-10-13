@@ -21,6 +21,7 @@ Funziona su telefono e computer, segue il tema chiaro/scuro del dispositivo (o l
   - esportazione **CSV** di giornate e permessi
 - **Profilo**: foto come sui social (la scegli dalla galleria o la scatti, poi la sposti e la ingrandisci), nome e qualche numero. La foto resta visibile in alto in ogni schermata (nella barra laterale sul computer).
 - **Team**: il team è fisso (Carlo capo; Fortunato, Serena, Fabio, Manuela, Angelo e Alessandro senior; Davide, Roberta e Irene junior, vedi `ROSTER` in `src/lib/team.ts`). Dopo la registrazione con email e password si sceglie quale persona si è (una sola, e solo se è libera). Nella pagina Team si vedono gli orari dei colleghi giorno per giorno e, toccando una persona, la sua settimana. Gli orari del **capo** non sono mai visibili; ognuno può **nascondere i propri** con un interruttore (di base sono visibili). Ai colleghi arrivano solo il tipo di giornata (sede, smart working, ferie, assente) e gli orari di entrata e uscita: mai note, permessi, pausa o saldo ore, e una malattia compare come «Assente».
+- **Calendario Outlook**: da Impostazioni si sceglie un file `.ics` esportato da Outlook (o da Google Calendar, Apple…). L'app legge gli eventi di **giornata intera**, anche quelli che si ripetono (per esempio «Smart working» ogni mercoledì), li raggruppa per titolo e propone ferie, smart working, malattia o festività dal titolo (o dal «Fuori sede» di Outlook); tu confermi o cambi. Si importano solo i giorni in cui lavori (niente fine settimana né festività nazionali), da un anno fa a un anno avanti. Le giornate già registrate restano come sono, a meno di chiederne la sostituzione. Le riunioni con orario si ignorano. Non serve nessun accesso a Microsoft: si legge un file. Un collegamento che si aggiorna da solo (Microsoft Graph) richiederebbe la registrazione di un'app su Azure e, per un account aziendale, il consenso dell'amministratore IT.
 - **Impostazioni**: orario settimanale, limite smart working, monte permessi, festività nazionali, data di inizio conteggio, saldo di partenza, tema, copia di sicurezza (JSON) e ripristino.
 
 ## Come si calcolano le ore
@@ -114,8 +115,8 @@ Le pagine usano indirizzi con `#` (per esempio `/#/dashboard`), quindi non servo
 - Grafici disegnati a mano in SVG (nessuna libreria), stile blu notte, giallo e blu cobalto (ispirato ai colori di Poste Italiane, senza usarne il logo) con tema automatico chiaro/scuro
 
 ```
-src/lib/       regole di calcolo (calc), statistiche (stats), salvataggio (store), account locali (accounts), team condiviso (team), festività, dati di esempio
-src/screens/   Oggi, Calendario, Dashboard, Permessi, Team, Impostazioni, Profilo, scelta della persona (Pick), editor di giornata e permesso
+src/lib/       regole di calcolo (calc), statistiche (stats), salvataggio (store), account locali (accounts), team condiviso (team), calendario .ics (ics), festività, dati di esempio
+src/screens/   Oggi, Calendario, Dashboard, Permessi, Team, Impostazioni, Profilo, scelta della persona (Pick), importazione da Outlook, editor di giornata e permesso
 src/components/charts/   grafici (barre, linee, intervalli, mappa dell'anno, barre orizzontali)
 supabase/setup.sql       tabelle e regole di sicurezza
 tests/                   test delle regole di calcolo
